@@ -16,7 +16,7 @@ class GameState extends ChangeNotifier {
   BoardTheme currentTheme = BoardTheme.classic;
   bool musicEnabled = true;
   bool sfxEnabled = true;
-  bool _isMatchActive = false; // Flag to kill background AI activities
+  bool isMatchActive = false; // Flag to kill background AI activities
 
   void setTheme(BoardTheme theme) {
     currentTheme = theme;
@@ -54,13 +54,13 @@ class GameState extends ChangeNotifier {
     PlayerType.blue: false,
   };
 
-  int _sixCount = 0;
+  int sixCount = 0;
 
   GameState() {
-    _initPieces();
+    initPieces();
   }
 
-  void _initPieces() {
+  void initPieces() {
     pieces = [];
     for (var type in PlayerType.values) {
       for (int i = 0; i < 4; i++) {
@@ -68,7 +68,7 @@ class GameState extends ChangeNotifier {
       }
     }
     hasKilled = { for (var v in PlayerType.values) v: false };
-    _sixCount = 0;
+    sixCount = 0;
   }
 
   void updateRules(GameRules newRules) {
@@ -80,7 +80,7 @@ class GameState extends ChangeNotifier {
     required Map<PlayerType, PlayerMode> modes,
     required GameRules gameRules,
   }) {
-    _initPieces();
+    initPieces();
     playerModes = modes;
     rules = gameRules;
     currentPlayer = PlayerType.red;
@@ -89,19 +89,19 @@ class GameState extends ChangeNotifier {
     status = GameStatus.rolling;
     winners = [];
     movablePieces = [];
-    _isMatchActive = true;
+    isMatchActive = true;
     notifyListeners();
     
     _checkAndExecuteCpuTurn();
   }
 
   void quitMatch() {
-    _isMatchActive = false;
+    isMatchActive = false;
   }
 
   void resetGame() {
-    _initPieces();
-    _isMatchActive = true;
+    initPieces();
+    isMatchActive = true;
     currentPlayer = PlayerType.red;
     diceValue = 0;
     isDiceRolling = false;
@@ -113,32 +113,32 @@ class GameState extends ChangeNotifier {
   }
 
   Future<void> rollDice() async {
-    if (!_isMatchActive || isDiceRolling || status != GameStatus.rolling) return;
+    if (!isMatchActive || isDiceRolling || status != GameStatus.rolling) return;
     
     isDiceRolling = true;
     AudioManager().playDice();
     notifyListeners();
 
     await Future.delayed(const Duration(milliseconds: 600));
-    if (!_isMatchActive) return; // Kill if quitted during delay
+    if (!isMatchActive) return; // Kill if quitted during delay
     
     diceValue = _random.nextInt(6) + 1;
     isDiceRolling = false;
     
     if (diceValue == 6) {
-      _sixCount++;
-      if (_sixCount == 3) {
+      sixCount++;
+      if (sixCount == 3) {
         // Three 6s = turn lost
-        _sixCount = 0;
+        sixCount = 0;
         status = GameStatus.moving;
         notifyListeners();
         await Future.delayed(const Duration(seconds: 1));
-        if (!_isMatchActive) return;
+        if (!isMatchActive) return;
         nextTurn();
         return;
       }
     } else {
-      _sixCount = 0;
+      sixCount = 0;
     }
 
     _calculateMovablePieces();
@@ -147,7 +147,7 @@ class GameState extends ChangeNotifier {
       status = GameStatus.moving;
       notifyListeners();
       await Future.delayed(const Duration(seconds: 1));
-      if (!_isMatchActive) return;
+      if (!isMatchActive) return;
       nextTurn();
     } else {
       status = GameStatus.selecting;
@@ -155,7 +155,7 @@ class GameState extends ChangeNotifier {
       
     if (playerModes[currentPlayer] == PlayerMode.ai) {
         await Future.delayed(const Duration(milliseconds: 500));
-        if (!_isMatchActive) return;
+        if (!isMatchActive) return;
         _cpuPickPiece();
       }
     }
@@ -217,7 +217,7 @@ class GameState extends ChangeNotifier {
   }
 
   Future<void> movePiece(PieceModel piece) async {
-    if (!_isMatchActive || status != GameStatus.selecting || !movablePieces.contains(piece)) return;
+    if (!isMatchActive || status != GameStatus.selecting || !movablePieces.contains(piece)) return;
 
     status = GameStatus.moving;
     notifyListeners();
@@ -226,7 +226,7 @@ class GameState extends ChangeNotifier {
       piece.progress = 0; 
     } else {
       for (int i = 0; i < diceValue; i++) {
-        if (!_isMatchActive) return;
+        if (!isMatchActive) return;
         piece.progress++;
         AudioManager().playMove();
         notifyListeners();
@@ -235,7 +235,7 @@ class GameState extends ChangeNotifier {
       }
     }
 
-    if (!_isMatchActive) return; // Guard after movement loop
+    if (!isMatchActive) return; // Guard after movement loop
     bool hasWon = piece.progress == 56;
     bool caughtSomeone = _checkCollisions(piece);
     if (caughtSomeone) {
@@ -297,8 +297,8 @@ class GameState extends ChangeNotifier {
   }
 
   void nextTurn() {
-    if (!_isMatchActive) return;
-    _sixCount = 0;
+    if (!isMatchActive) return;
+    sixCount = 0;
     int currentIdx = PlayerType.values.indexOf(currentPlayer);
     int nextIdx = (currentIdx + 1) % 4;
     currentPlayer = PlayerType.values[nextIdx];
@@ -317,12 +317,13 @@ class GameState extends ChangeNotifier {
   }
 
   Future<void> _checkAndExecuteCpuTurn() async {
-    if (!_isMatchActive || status == GameStatus.finished) return;
+    if (!isMatchActive || status == GameStatus.finished) return;
     
     if (playerModes[currentPlayer] == PlayerMode.ai) {
       await Future.delayed(const Duration(milliseconds: 1000));
-      if (!_isMatchActive) return;
+      if (!isMatchActive) return;
       rollDice();
     }
+    // PlayerMode.online: remote player handles their own turn
   }
 }

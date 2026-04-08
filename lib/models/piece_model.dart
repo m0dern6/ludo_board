@@ -1,7 +1,7 @@
 
 enum PlayerType { red, green, yellow, blue }
 
-enum PlayerMode { human, ai }
+enum PlayerMode { human, ai, online }
 
 enum BoardTheme { classic, royal }
 
