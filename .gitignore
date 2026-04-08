@@ -54,5 +54,6 @@ debug_keys.txt
 
 # Firebase Config Files
 /android/app/google-services.json
+/ios/Runner/Info.plist
 /ios/Runner/GoogleService-Info.plist
 /lib/firebase_options.dart
