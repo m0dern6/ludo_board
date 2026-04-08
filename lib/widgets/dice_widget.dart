@@ -16,6 +16,7 @@ class CornerDice extends StatelessWidget {
     final state = Provider.of<GameState>(context);
     final bool isMyTurn = state.currentPlayer == player;
     final bool isBot = state.playerModes[player] == PlayerMode.ai;
+    final bool isOnline = state.playerModes[player] == PlayerMode.online;
 
     // We use Opacity and IgnorePointer to maintain the board's centering
     // instead of shrinking the widget footprint.
@@ -23,12 +24,12 @@ class CornerDice extends StatelessWidget {
       opacity: isMyTurn ? 1.0 : 0.0,
       child: IgnorePointer(
         ignoring: !isMyTurn,
-        child: _buildDiceBody(context, state, isBot),
+        child: _buildDiceBody(context, state, isBot, isOnline),
       ),
     );
   }
 
-  Widget _buildDiceBody(BuildContext context, GameState state, bool isBot) {
+  Widget _buildDiceBody(BuildContext context, GameState state, bool isBot, bool isOnline) {
 
     Color diceColor;
     String labelText;
@@ -41,6 +42,8 @@ class CornerDice extends StatelessWidget {
 
     if (isBot) {
       labelText = "AI THINKING...";
+    } else if (isOnline) {
+      labelText = "WAITING...";
     } else {
       labelText = state.status == GameStatus.rolling ? "TAP TO ROLL" : "SELECT PIECE";
     }
@@ -61,7 +64,7 @@ class CornerDice extends StatelessWidget {
         ],
         border: Border.all(color: diceColor.withOpacity(0.5), width: 2),
       ),
-      child: _ActiveDiceInternal(state: state, color: diceColor, isBot: isBot),
+      child: _ActiveDiceInternal(state: state, color: diceColor, isBot: isBot || isOnline),
     );
 
     final textWidget = Padding(
