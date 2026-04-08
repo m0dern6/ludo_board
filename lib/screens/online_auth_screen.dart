@@ -169,13 +169,7 @@ class _SignInView extends StatelessWidget {
             else
               ElevatedButton.icon(
                 onPressed: onSignIn,
-                icon: Image.network(
-                  'https://developers.google.com/identity/images/g-logo.png',
-                  width: 20,
-                  height: 20,
-                  errorBuilder: (_, __, ___) =>
-                      const Icon(Icons.login, size: 20),
-                ),
+                icon: const Icon(Icons.login, size: 20, color: Colors.blue),
                 label: const Text('Sign in with Google'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,

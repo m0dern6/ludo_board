@@ -113,7 +113,7 @@ class ChatService {
   // ──────────────────────────────────────────────
 
   String _filterText(String text) {
-    String result = text.toLowerCase();
+    String result = text;
     for (final word in _badWords) {
       result = result.replaceAll(
         RegExp(r'\b' + RegExp.escape(word) + r'\b', caseSensitive: false),
