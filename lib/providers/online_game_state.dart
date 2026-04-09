@@ -238,7 +238,16 @@ class OnlineGameState extends GameState {
         } else {
           final startProg = pieceToAnimate.progress;
           for (int i = startProg + 1; i <= animateTarget!; i++) {
-            if (!isMatchActive) return;
+            if (!isMatchActive) {
+              // Match ended mid-animation – snap to final positions immediately.
+              for (final p in pieces) {
+                final key = '${p.type.name}_${p.id}';
+                final newProg = newPositions[key];
+                if (newProg != null) p.progress = newProg;
+              }
+              notifyListeners();
+              return;
+            }
             pieceToAnimate.progress = i;
             AudioManager().playMove();
             notifyListeners();
