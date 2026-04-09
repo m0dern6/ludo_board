@@ -13,13 +13,45 @@ class AudioManager {
   bool _sfxEnabled = true;
 
   Future<void> init() async {
-    _bgmPlayer.setReleaseMode(ReleaseMode.loop);
+    await _bgmPlayer.setReleaseMode(ReleaseMode.loop);
+    await _bgmPlayer.setPlayerMode(PlayerMode.mediaPlayer);
+    await _bgmPlayer.setAudioContext(
+      AudioContext(
+        android: const AudioContextAndroid(
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.media,
+          audioFocus: AndroidAudioFocus.gain,
+        ),
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: {AVAudioSessionOptions.mixWithOthers},
+        ),
+      ),
+    );
+
+    for (final player in _sfxPlayers) {
+      await player.setPlayerMode(PlayerMode.lowLatency);
+      await player.setReleaseMode(ReleaseMode.stop);
+      await player.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            contentType: AndroidContentType.sonification,
+            usageType: AndroidUsageType.game,
+            audioFocus: AndroidAudioFocus.none,
+          ),
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.ambient,
+            options: {AVAudioSessionOptions.mixWithOthers},
+          ),
+        ),
+      );
+    }
   }
 
   void updateSettings(bool music, bool sfx) {
     _musicEnabled = music;
     _sfxEnabled = sfx;
-    
+
     if (!_musicEnabled) {
       pauseBgm();
     } else {
@@ -41,7 +73,7 @@ class AudioManager {
     try {
       await _bgmPlayer.stop();
     } catch (e) {
-       print("Error stopping BGM: $e");
+      print("Error stopping BGM: $e");
     }
   }
 
@@ -58,7 +90,8 @@ class AudioManager {
     if (!_sfxEnabled) return;
     try {
       final player = _sfxPlayers[_nextSfx];
-      await player.stop(); // Stop before play to avoid overlapping issues on some platforms
+      await player
+          .stop(); // Stop before play to avoid overlapping issues on some platforms
       await player.play(AssetSource(path));
       _nextSfx = (_nextSfx + 1) % _sfxPlayers.length;
     } catch (e) {
