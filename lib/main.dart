@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'constants/colors.dart';
@@ -432,9 +433,7 @@ class HomeScreen extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => const OnlineAuthScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const OnlineAuthScreen()),
                   );
                 },
               ),
@@ -884,10 +883,22 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   late GameState _gameState;
 
+  void _enableImmersiveMode() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  void _restoreSystemUi() {
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     _gameState = Provider.of<GameState>(context, listen: false);
+    _enableImmersiveMode();
     // Stop BGM when match starts
     AudioManager().stopBgm();
   }
@@ -899,6 +910,7 @@ class _GameScreenState extends State<GameScreen> {
     // Clean up all SFX and Resume BGM when exiting match
     AudioManager().stopAllSfx();
     AudioManager().startBgm();
+    _restoreSystemUi();
     super.dispose();
   }
 
