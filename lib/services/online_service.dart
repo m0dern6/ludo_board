@@ -49,6 +49,14 @@ class OnlineService {
     return code;
   }
 
+  /// Diagonal color pairing for fair 2-player games.
+  static const Map<String, String> _diagonalColor = {
+    'red': 'yellow',
+    'yellow': 'red',
+    'green': 'blue',
+    'blue': 'green',
+  };
+
   /// Join an existing room. Returns an error string or null on success.
   Future<String?> joinRoom({
     required String code,
@@ -67,13 +75,22 @@ class OnlineService {
     if (players.length >= 4) return 'Room is full (max 4 players).';
     if (players.containsKey(uid)) return null; // already joined
 
-    // Pick the first unused color
     final takenColors = players.values
         .map((v) => (v as Map<dynamic, dynamic>)['color'] as String?)
         .whereType<String>()
         .toSet();
     final allColors = ['red', 'green', 'yellow', 'blue'];
-    final color = allColors.firstWhere((c) => !takenColors.contains(c));
+
+    // For the 2nd player, auto-assign the diagonal of the existing player's
+    // color so their home bases are always in cross-section.
+    String color;
+    if (players.length == 1) {
+      final existingColor = takenColors.first;
+      color = _diagonalColor[existingColor] ??
+          allColors.firstWhere((c) => !takenColors.contains(c));
+    } else {
+      color = allColors.firstWhere((c) => !takenColors.contains(c));
+    }
 
     await ref.child('players/$uid').set({
       'uid': uid,
@@ -107,33 +124,38 @@ class OnlineService {
   // Game start
   // ──────────────────────────────────────────────
 
-  /// Host starts the match. Fills remaining slots with AI players and writes
-  /// the initial game state to RTDB.
+  /// Host starts the match. Fills remaining slots with AI players when
+  /// [rules.fillWithAi] is true, then writes the initial game state to RTDB.
   Future<void> startGame(String code) async {
     final ref = roomRef(code);
     final snapshot = await ref.get();
     final data = snapshot.value as Map<dynamic, dynamic>;
     final players = Map<String, dynamic>.from(
         (data['players'] as Map<dynamic, dynamic>).cast<String, dynamic>());
+    final rules = GameRules.fromJson(
+        ((data['rules'] as Map<dynamic, dynamic>?)?.cast<String, dynamic>()) ??
+            {});
 
-    // Assign AI for unfilled slots
+    // Assign AI for unfilled slots only when fillWithAi is enabled.
     const allColors = ['red', 'green', 'yellow', 'blue'];
-    final takenColors = players.values
-        .map((v) => (v as Map<dynamic, dynamic>)['color'] as String)
-        .toSet();
-    int aiIdx = 0;
-    for (final color in allColors) {
-      if (!takenColors.contains(color)) {
-        final aiId = 'ai_$color';
-        players[aiId] = {
-          'uid': aiId,
-          'name': 'AI ${color[0].toUpperCase()}${color.substring(1)}',
-          'avatar': aiIdx % 8,
-          'color': color,
-          'isAi': true,
-          'isOnline': true,
-        };
-        aiIdx++;
+    if (rules.fillWithAi) {
+      final takenColors = players.values
+          .map((v) => (v as Map<dynamic, dynamic>)['color'] as String)
+          .toSet();
+      int aiIdx = 0;
+      for (final color in allColors) {
+        if (!takenColors.contains(color)) {
+          final aiId = 'ai_$color';
+          players[aiId] = {
+            'uid': aiId,
+            'name': 'AI ${color[0].toUpperCase()}${color.substring(1)}',
+            'avatar': aiIdx % 8,
+            'color': color,
+            'isAi': true,
+            'isOnline': true,
+          };
+          aiIdx++;
+        }
       }
     }
 
@@ -182,6 +204,54 @@ class OnlineService {
       piecesMap['${p.type.name}_${p.id}'] = {'progress': p.progress};
     }
     await roomRef(code).child('game/pieces').set(piecesMap);
+  }
+
+  // ──────────────────────────────────────────────
+  // Room rules update
+  // ──────────────────────────────────────────────
+
+  /// Update game rules for a room (host only).
+  Future<void> updateRules(String code, GameRules rules) async {
+    await roomRef(code).child('rules').update(rules.toJson());
+  }
+
+  // ──────────────────────────────────────────────
+  // Color change
+  // ──────────────────────────────────────────────
+
+  /// Change a player's color. For 2-player rooms the other player's color is
+  /// automatically updated to maintain the diagonal-pairing constraint.
+  /// Returns an error string or null on success.
+  Future<String?> changePlayerColor({
+    required String code,
+    required String uid,
+    required String newColor,
+  }) async {
+    final ref = roomRef(code);
+    final snapshot = await ref.get();
+    if (!snapshot.exists) return 'Room not found.';
+
+    final data = snapshot.value as Map<dynamic, dynamic>;
+    final players = data['players'] as Map<dynamic, dynamic>? ?? {};
+
+    if (players.length == 2) {
+      // Enforce diagonal constraint: auto-update the other player's color.
+      final otherUid =
+          players.keys.cast<String>().firstWhere((k) => k != uid);
+      final diagonalColor = _diagonalColor[newColor]!;
+      await ref.child('players/$uid/color').set(newColor);
+      await ref.child('players/$otherUid/color').set(diagonalColor);
+    } else {
+      // 3+ players: just ensure color isn't already taken.
+      for (final entry in players.entries) {
+        if (entry.key != uid) {
+          final player = entry.value as Map<dynamic, dynamic>;
+          if (player['color'] == newColor) return 'Color already taken.';
+        }
+      }
+      await ref.child('players/$uid/color').set(newColor);
+    }
+    return null;
   }
 
   // ──────────────────────────────────────────────

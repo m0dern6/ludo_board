@@ -25,8 +25,15 @@ class OnlineGameState extends GameState {
 
   final OnlineService _svc = OnlineService();
   StreamSubscription<DatabaseEvent>? _gameSub;
+  StreamSubscription<DatabaseEvent>? _playersSub;
   bool _skipNextRemoteUpdate = false;
   bool _initialized = false;
+
+  // Tracks names of players we've seen so we can detect departures.
+  Map<String, String> _knownPlayerNames = {};
+
+  // Notified when a player leaves mid-game. Consumed by the UI then cleared.
+  String? playerLeftMessage;
 
   OnlineGameState({
     required this.roomCode,
@@ -43,12 +50,19 @@ class OnlineGameState extends GameState {
   void startListening() {
     _gameSub?.cancel();
     _gameSub = _svc.gameStream(roomCode).listen(_onRemoteGameUpdate);
+    _playersSub?.cancel();
+    _playersSub = _svc.roomRef(roomCode).child('players').onValue.listen(_onPlayersUpdate);
   }
 
   @override
   void dispose() {
     _gameSub?.cancel();
+    _playersSub?.cancel();
     super.dispose();
+  }
+
+  void clearPlayerLeftMessage() {
+    playerLeftMessage = null;
   }
 
   // ──────────────────────────────────────────────
@@ -70,7 +84,42 @@ class OnlineGameState extends GameState {
       Future.delayed(const Duration(milliseconds: 800), () {
         if (isMatchActive) _checkAndExecuteAiTurn();
       });
+    } else if (isHost && playerModes[currentPlayer] == PlayerMode.absent) {
+      // Skip absent (non-participating) color slot.
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (isMatchActive) _doNextTurn();
+      });
     }
+  }
+
+  // Detect players leaving the room mid-game.
+  void _onPlayersUpdate(DatabaseEvent event) {
+    final data = event.snapshot.value as Map<dynamic, dynamic>?;
+    if (data == null) {
+      // Room was deleted (host left).
+      if (_knownPlayerNames.isNotEmpty && isMatchActive) {
+        playerLeftMessage = 'Host left the game';
+        notifyListeners();
+      }
+      return;
+    }
+
+    final current = <String, String>{};
+    for (final entry in data.entries) {
+      final uid = entry.key as String;
+      final playerData = entry.value as Map<dynamic, dynamic>;
+      current[uid] = playerData['name'] as String? ?? 'Player';
+    }
+
+    // Check for players who disappeared since last update.
+    for (final entry in _knownPlayerNames.entries) {
+      if (entry.key != localUid && !current.containsKey(entry.key)) {
+        playerLeftMessage = '${entry.value} left the game';
+        notifyListeners();
+      }
+    }
+
+    _knownPlayerNames = current;
   }
 
   void _applyRemoteState(Map<dynamic, dynamic> data) {
@@ -290,7 +339,14 @@ class OnlineGameState extends GameState {
 
     if (allFinished && !winners.contains(piece.type)) {
       winners.add(piece.type);
-      if (winners.length == 3) {
+
+      final int totalActive = PlayerType.values
+          .where((p) => playerModes[p] != PlayerMode.absent)
+          .length;
+      final int activeWinners =
+          winners.where((w) => playerModes[w] != PlayerMode.absent).length;
+
+      if (activeWinners >= totalActive - 1) {
         AudioManager().playVictory();
         for (final pType in PlayerType.values) {
           if (!winners.contains(pType)) winners.add(pType);
@@ -350,9 +406,14 @@ class OnlineGameState extends GameState {
     int idx = PlayerType.values.indexOf(currentPlayer);
     int next = (idx + 1) % 4;
     currentPlayer = PlayerType.values[next];
-    while (winners.contains(currentPlayer) && winners.length < 4) {
+
+    int safety = 0;
+    while (safety < 4 &&
+        (winners.contains(currentPlayer) ||
+            playerModes[currentPlayer] == PlayerMode.absent)) {
       next = (next + 1) % 4;
       currentPlayer = PlayerType.values[next];
+      safety++;
     }
     status = GameStatus.rolling;
     diceValue = 0;
@@ -365,11 +426,15 @@ class OnlineGameState extends GameState {
   Future<void> _checkAndExecuteAiTurn() async {
     if (!isMatchActive || status == GameStatus.finished) return;
     if (!isHost) return;
-    if (playerModes[currentPlayer] != PlayerMode.ai) return;
-
-    await Future.delayed(const Duration(milliseconds: 1000));
-    if (!isMatchActive) return;
-    await rollDice();
+    if (playerModes[currentPlayer] == PlayerMode.ai) {
+      await Future.delayed(const Duration(milliseconds: 1000));
+      if (!isMatchActive) return;
+      await rollDice();
+    } else if (playerModes[currentPlayer] == PlayerMode.absent) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!isMatchActive) return;
+      await _doNextTurn();
+    }
   }
 
   Future<void> _aiPickPiece() async {
@@ -414,19 +479,25 @@ class OnlineGameState extends GameState {
     rules = gameRules;
     isMatchActive = true;
 
+    // Seed known player names for leave-detection.
+    _knownPlayerNames = {
+      for (final p in players.values) p.uid: p.name,
+    };
+
     for (final color in PlayerType.values) {
-      final matchingPlayer = players.values.firstWhere(
-        (p) => p.color == color.name,
-        orElse: () => OnlinePlayer(
-          uid: 'ai_${color.name}',
-          name: 'AI',
-          avatar: 0,
-          color: color.name,
-          isAi: true,
-        ),
-      );
-      playerModes[color] =
-          matchingPlayer.isAi ? PlayerMode.ai : PlayerMode.online;
+      final matchingPlayer =
+          players.values.where((p) => p.color == color.name).firstOrNull;
+
+      if (matchingPlayer == null) {
+        playerModes[color] = PlayerMode.absent;
+      } else if (matchingPlayer.isAi) {
+        playerModes[color] = PlayerMode.ai;
+      } else {
+        playerModes[color] = PlayerMode.online;
+        // Populate display info for human players.
+        playerDisplayNames[color] = matchingPlayer.name;
+        playerDisplayAvatars[color] = matchingPlayer.avatar;
+      }
     }
 
     startListening();

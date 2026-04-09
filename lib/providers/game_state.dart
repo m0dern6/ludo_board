@@ -43,6 +43,10 @@ class GameState extends ChangeNotifier {
     PlayerType.blue: PlayerMode.human,
   };
 
+  // Optional display info for online players (avatar index + name)
+  Map<PlayerType, String> playerDisplayNames = {};
+  Map<PlayerType, int> playerDisplayAvatars = {};
+
   // Game Rules
   GameRules rules = GameRules();
   
@@ -303,9 +307,14 @@ class GameState extends ChangeNotifier {
     int nextIdx = (currentIdx + 1) % 4;
     currentPlayer = PlayerType.values[nextIdx];
     
-    while (winners.contains(currentPlayer) && winners.length < 4) {
+    // Skip winners and absent (non-participating) players
+    int safety = 0;
+    while (safety < 4 &&
+        (winners.contains(currentPlayer) ||
+            playerModes[currentPlayer] == PlayerMode.absent)) {
       nextIdx = (nextIdx + 1) % 4;
       currentPlayer = PlayerType.values[nextIdx];
+      safety++;
     }
 
     status = GameStatus.rolling;

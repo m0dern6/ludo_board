@@ -8,8 +8,16 @@ import '../constants/colors.dart';
 class CornerDice extends StatelessWidget {
   final PlayerType player;
   final bool textAtTop;
+  /// When true the local player owns this dice slot; show interactive label
+  /// instead of "WAITING…" even though the player mode is [PlayerMode.online].
+  final bool isLocalPlayer;
 
-  const CornerDice({super.key, required this.player, this.textAtTop = true});
+  const CornerDice({
+    super.key,
+    required this.player,
+    this.textAtTop = true,
+    this.isLocalPlayer = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -42,11 +50,15 @@ class CornerDice extends StatelessWidget {
 
     if (isBot) {
       labelText = "AI THINKING...";
-    } else if (isOnline) {
+    } else if (isOnline && !isLocalPlayer) {
+      // Remote online player's turn — the local device just waits.
       labelText = "WAITING...";
     } else {
       labelText = state.status == GameStatus.rolling ? "TAP TO ROLL" : "SELECT PIECE";
     }
+
+    // The dice face is non-interactive for bots and for remote online turns.
+    final bool blockInteraction = isBot || (isOnline && !isLocalPlayer);
 
     final diceSquare = Container(
       width: 70,
@@ -64,7 +76,7 @@ class CornerDice extends StatelessWidget {
         ],
         border: Border.all(color: diceColor.withOpacity(0.5), width: 2),
       ),
-      child: _ActiveDiceInternal(state: state, color: diceColor, isBot: isBot || isOnline),
+      child: _ActiveDiceInternal(state: state, color: diceColor, blockInteraction: blockInteraction),
     );
 
     final textWidget = Padding(
@@ -94,9 +106,9 @@ class CornerDice extends StatelessWidget {
 class _ActiveDiceInternal extends StatefulWidget {
   final GameState state;
   final Color color;
-  final bool isBot;
+  final bool blockInteraction;
 
-  const _ActiveDiceInternal({required this.state, required this.color, required this.isBot});
+  const _ActiveDiceInternal({required this.state, required this.color, required this.blockInteraction});
 
   @override
   __ActiveDiceInternalState createState() => __ActiveDiceInternalState();
@@ -131,7 +143,7 @@ class __ActiveDiceInternalState extends State<_ActiveDiceInternal> with SingleTi
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      ignoring: widget.isBot,
+      ignoring: widget.blockInteraction,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
