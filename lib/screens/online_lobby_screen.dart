@@ -1,3 +1,4 @@
+import 'package:board/models/piece_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -57,10 +58,7 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => OnlineRoomScreen(
-            roomCode: code,
-            localUid: _user.uid,
-          ),
+          builder: (_) => OnlineRoomScreen(roomCode: code, localUid: _user.uid),
         ),
       );
     } catch (e) {
@@ -95,10 +93,7 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => OnlineRoomScreen(
-            roomCode: code,
-            localUid: _user.uid,
-          ),
+          builder: (_) => OnlineRoomScreen(roomCode: code, localUid: _user.uid),
         ),
       );
     } catch (e) {
@@ -116,7 +111,10 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: Text(
           'JOIN ROOM',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.w900, letterSpacing: 2),
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -161,11 +159,16 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: GameColors.blue,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text('JOIN',
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'JOIN',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -188,8 +191,10 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
               if (mounted) Navigator.pop(context);
             },
             icon: const Icon(Icons.logout, color: Colors.grey, size: 18),
-            label: const Text('Sign out',
-                style: TextStyle(color: Colors.grey, fontSize: 12)),
+            label: const Text(
+              'Sign out',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
           ),
         ],
       ),
@@ -208,8 +213,10 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
                 ),
                 child: Row(
                   children: [
-                    Text(avatarEmoji(_selectedAvatar),
-                        style: const TextStyle(fontSize: 36)),
+                    Text(
+                      avatarEmoji(_selectedAvatar),
+                      style: const TextStyle(fontSize: 36),
+                    ),
                     const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,12 +224,16 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
                         Text(
                           _name,
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
                         Text(
                           _user.email ?? '',
                           style: const TextStyle(
-                              color: Colors.grey, fontSize: 12),
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -242,7 +253,8 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
               const SizedBox(height: 16),
               if (_isLoading)
                 const Center(
-                    child: CircularProgressIndicator(color: GameColors.red))
+                  child: CircularProgressIndicator(color: GameColors.red),
+                )
               else ...[
                 _LobbyButton(
                   title: 'CREATE ROOM',
@@ -270,14 +282,19 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline,
-                          color: GameColors.red, size: 18),
+                      const Icon(
+                        Icons.error_outline,
+                        color: GameColors.red,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _error!,
                           style: const TextStyle(
-                              color: GameColors.red, fontSize: 13),
+                            color: GameColors.red,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
@@ -340,14 +357,18 @@ class _LobbyButton extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                          letterSpacing: 1)),
-                  Text(subtitle,
-                      style: const TextStyle(
-                          color: Colors.grey, fontSize: 12)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
                 ],
               ),
             ),

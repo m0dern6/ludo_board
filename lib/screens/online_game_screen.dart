@@ -140,13 +140,14 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
                 const SizedBox(height: 16),
               ],
             ),
-        ),
+          ),
           // Chat overlay
           bottomSheet: _chatOpen
               ? _ChatPanel(
                   roomCode: widget.roomCode,
                   localUid: widget.localUid,
-                  localName: widget.initialRoom.players[widget.localUid]?.name ??
+                  localName:
+                      widget.initialRoom.players[widget.localUid]?.name ??
                       'Player',
                   localAvatar:
                       widget.initialRoom.players[widget.localUid]?.avatar ?? 0,
@@ -264,7 +265,8 @@ class _OnlineCornerDice extends StatelessWidget {
       opacity: isMyTurn ? 1.0 : 0.0,
       child: IgnorePointer(
         // Only interactive when it's LOCAL player's turn (or AI handled by host)
-        ignoring: !isMyTurn ||
+        ignoring:
+            !isMyTurn ||
             (player != localColor &&
                 state.playerModes[player] != PlayerMode.ai),
         child: CornerDice(player: player, textAtTop: textAtTop),
@@ -281,10 +283,7 @@ class _OnlineQuitButton extends StatelessWidget {
   final String roomCode;
   final String localUid;
 
-  const _OnlineQuitButton({
-    required this.roomCode,
-    required this.localUid,
-  });
+  const _OnlineQuitButton({required this.roomCode, required this.localUid});
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +330,9 @@ class _OnlineQuitButton extends StatelessWidget {
           child: Text(
             'QUIT MATCH?',
             style: GoogleFonts.outfit(
-                fontWeight: FontWeight.w900, letterSpacing: 2),
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2,
+            ),
           ),
         ),
         content: const Text(
@@ -346,9 +347,13 @@ class _OnlineQuitButton extends StatelessWidget {
               Expanded(
                 child: TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('STAY',
-                      style: TextStyle(
-                          color: Colors.grey, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'STAY',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -356,22 +361,25 @@ class _OnlineQuitButton extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: () async {
                     Navigator.pop(ctx);
-                    await OnlineService()
-                        .leaveRoom(roomCode, localUid);
+                    await OnlineService().leaveRoom(roomCode, localUid);
                     if (context.mounted) {
-                      Navigator.of(context)
-                          .popUntil((route) => route.isFirst);
+                      Navigator.of(context).popUntil((route) => route.isFirst);
                     }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GameColors.red,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     elevation: 0,
                   ),
-                  child: const Text('QUIT',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'QUIT',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -461,8 +469,7 @@ class _ChatPanelState extends State<_ChatPanel> {
       height: 300,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -504,20 +511,29 @@ class _ChatPanelState extends State<_ChatPanel> {
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(
-                      child: Text('No messages yet.',
-                          style: TextStyle(color: Colors.grey)));
+                    child: Text(
+                      'No messages yet.',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  );
                 }
                 final msgs = _chat.parseChatMessages(
-                    snapshot.data!.snapshot.value);
+                  snapshot.data!.snapshot.value,
+                );
                 if (msgs.isEmpty) {
                   return const Center(
-                      child: Text('No messages yet.',
-                          style: TextStyle(color: Colors.grey, fontSize: 13)));
+                    child: Text(
+                      'No messages yet.',
+                      style: TextStyle(color: Colors.grey, fontSize: 13),
+                    ),
+                  );
                 }
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   itemCount: msgs.length,
                   itemBuilder: (_, i) {
                     final msg = msgs[i];
@@ -529,10 +545,11 @@ class _ChatPanelState extends State<_ChatPanel> {
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 6),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         constraints: BoxConstraints(
-                          maxWidth:
-                              MediaQuery.of(context).size.width * 0.7,
+                          maxWidth: MediaQuery.of(context).size.width * 0.7,
                         ),
                         decoration: BoxDecoration(
                           color: isMe
@@ -588,19 +605,16 @@ class _ChatPanelState extends State<_ChatPanel> {
           // Error line
           if (_sendError != null)
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
               child: Text(
                 _sendError!,
-                style:
-                    const TextStyle(color: Colors.red, fontSize: 11),
+                style: const TextStyle(color: Colors.red, fontSize: 11),
               ),
             ),
 
           // Input row
           Padding(
-            padding:
-                const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
             child: Row(
               children: [
                 Expanded(
@@ -621,7 +635,9 @@ class _ChatPanelState extends State<_ChatPanel> {
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                     ),
                   ),
                 ),
