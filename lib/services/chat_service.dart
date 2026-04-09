@@ -25,9 +25,24 @@ class ChatService {
   // Bad word list (extend as needed)
   // ──────────────────────────────────────────────
   static const List<String> _badWords = [
-    'fuck', 'shit', 'ass', 'bitch', 'cunt', 'damn', 'bastard',
-    'dick', 'cock', 'pussy', 'nigger', 'faggot', 'retard',
-    'idiot', 'moron', 'stupid', 'kill yourself', 'kys',
+    'fuck',
+    'shit',
+    'ass',
+    'bitch',
+    'cunt',
+    'damn',
+    'bastard',
+    'dick',
+    'cock',
+    'pussy',
+    'nigger',
+    'faggot',
+    'retard',
+    'idiot',
+    'moron',
+    'stupid',
+    'kill yourself',
+    'kys',
   ];
 
   // ──────────────────────────────────────────────
@@ -55,8 +70,7 @@ class ChatService {
 
     // Check if banned
     if (limit.bannedUntil != null && now < limit.bannedUntil!) {
-      final remaining =
-          ((limit.bannedUntil! - now) / 1000).ceil();
+      final remaining = ((limit.bannedUntil! - now) / 1000).ceil();
       return 'You are muted for $remaining more second(s).';
     }
 
@@ -64,8 +78,8 @@ class ChatService {
     if (limit.bannedUntil != null && now >= limit.bannedUntil!) {
       if (limit.lastMessageAt != null &&
           now - limit.lastMessageAt! < _cooldownMs) {
-        final remaining =
-            ((_cooldownMs - (now - limit.lastMessageAt!)) / 1000).ceil();
+        final remaining = ((_cooldownMs - (now - limit.lastMessageAt!)) / 1000)
+            .ceil();
         return 'Please wait $remaining more second(s) before sending.';
       }
     }
@@ -102,7 +116,7 @@ class ChatService {
     final map = rawValue as Map<dynamic, dynamic>;
     final msgs = map.entries.map((e) {
       final v = e.value as Map<dynamic, dynamic>;
-      return ChatMessage.fromMap(v);
+      return ChatMessage.fromMap(v, id: e.key.toString());
     }).toList();
     msgs.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     return msgs;
