@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/colors.dart';
 import '../models/online_models.dart';
+import '../services/audio_manager.dart';
 import '../services/auth_service.dart';
 import '../services/online_service.dart';
 import 'online_room_screen.dart';
@@ -148,11 +149,15 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () {
+              AudioManager().playClick();
+              Navigator.pop(ctx);
+            },
             child: const Text('CANCEL', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () {
+              AudioManager().playClick();
               Navigator.pop(ctx);
               _joinRoom();
             },
@@ -187,6 +192,7 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
         actions: [
           TextButton.icon(
             onPressed: () async {
+              AudioManager().playClick();
               await _auth.signOut();
               if (mounted) Navigator.pop(context);
             },
@@ -326,7 +332,10 @@ class _LobbyButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        AudioManager().playClick();
+        onTap();
+      },
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),

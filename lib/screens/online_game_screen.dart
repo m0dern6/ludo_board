@@ -236,6 +236,7 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
                       'Player',
                   localAvatar:
                       widget.initialRoom.players[widget.localUid]?.avatar ?? 0,
+                  onClose: _toggleChat,
                 )
               : null,
         ),
@@ -296,15 +297,18 @@ class _OnlineHeader extends StatelessWidget {
           if (state.status == GameStatus.finished)
             const SizedBox()
           else
-            IconButton(
-              onPressed: onChatToggle,
-              icon: Container(
-                padding: const EdgeInsets.all(8),
+            GestureDetector(
+              onTap: () {
+                AudioManager().playClick();
+                onChatToggle();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
                   color: chatOpen
                       ? GameColors.blue.withOpacity(0.15)
                       : Colors.white,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.05),
@@ -312,10 +316,25 @@ class _OnlineHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Icon(
-                  chatOpen ? Icons.chat : Icons.chat_bubble_outline,
-                  color: chatOpen ? GameColors.blue : Colors.black87,
-                  size: 20,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      chatOpen ? Icons.chat : Icons.chat_bubble_outline,
+                      color: chatOpen ? GameColors.blue : Colors.black87,
+                      size: 20,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'CHAT',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                        color: chatOpen ? GameColors.blue : Colors.black54,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -360,14 +379,26 @@ class _CornerArea extends StatelessWidget {
       textAtTop: textAtTop,
       localColor: localColor,
     );
-    final bubble = _ChatBubble(message: chatMessage, color: bubbleColor);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: player == PlayerType.green || player == PlayerType.yellow
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
-      children: bubbleBelow ? [dice, bubble] : [bubble, dice],
+    if (chatMessage == null) return dice;
+
+    // Use Stack with Clip.none so the bubble floats outside the dice area
+    // without affecting the layout height (prevents the board from shifting).
+    final bool isRightAligned =
+        player == PlayerType.green || player == PlayerType.yellow;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        dice,
+        Positioned(
+          top: bubbleBelow ? null : -36,
+          bottom: bubbleBelow ? -36 : null,
+          left: isRightAligned ? null : 0,
+          right: isRightAligned ? 0 : null,
+          child: _ChatBubble(message: chatMessage, color: bubbleColor),
+        ),
+      ],
     );
   }
 }
@@ -384,7 +415,7 @@ class _ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (message == null) return const SizedBox(height: 4);
+    if (message == null) return const SizedBox.shrink();
     return Container(
       margin: const EdgeInsets.only(top: 2, bottom: 2),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -464,8 +495,10 @@ class _OnlineQuitButton extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40),
         child: ElevatedButton(
-          onPressed: () =>
-              Navigator.of(context).popUntil((route) => route.isFirst),
+          onPressed: () {
+            AudioManager().playClick();
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: GameColors.red,
@@ -483,7 +516,10 @@ class _OnlineQuitButton extends StatelessWidget {
       );
     }
     return TextButton.icon(
-      onPressed: () => _confirmQuit(context),
+      onPressed: () {
+        AudioManager().playClick();
+        _confirmQuit(context);
+      },
       icon: const Icon(Icons.arrow_back, color: Colors.grey),
       label: const Text(
         'QUIT MATCH',
@@ -518,7 +554,10 @@ class _OnlineQuitButton extends StatelessWidget {
             children: [
               Expanded(
                 child: TextButton(
-                  onPressed: () => Navigator.pop(ctx),
+                  onPressed: () {
+                    AudioManager().playClick();
+                    Navigator.pop(ctx);
+                  },
                   child: const Text(
                     'STAY',
                     style: TextStyle(
@@ -532,6 +571,7 @@ class _OnlineQuitButton extends StatelessWidget {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () async {
+                    AudioManager().playClick();
                     Navigator.pop(ctx);
                     await OnlineService().leaveRoom(roomCode, localUid);
                     if (context.mounted) {
@@ -571,12 +611,14 @@ class _ChatPanel extends StatefulWidget {
   final String localUid;
   final String localName;
   final int localAvatar;
+  final VoidCallback onClose;
 
   const _ChatPanel({
     required this.roomCode,
     required this.localUid,
     required this.localName,
     required this.localAvatar,
+    required this.onClose,
   });
 
   @override
@@ -652,26 +694,42 @@ class _ChatPanelState extends State<_ChatPanel> {
       ),
       child: Column(
         children: [
-          // Handle bar
-          Container(
-            margin: const EdgeInsets.only(top: 10),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'CHAT',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 3,
-                color: Colors.grey,
-              ),
+        // Handle bar + header row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
+            child: Row(
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                const Text(
+                  'CHAT',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 3,
+                    color: Colors.grey,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () {
+                    AudioManager().playClick();
+                    widget.onClose();
+                  },
+                  icon: const Icon(Icons.close, size: 20, color: Colors.grey),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
             ),
           ),
           const Divider(height: 1),
@@ -815,7 +873,10 @@ class _ChatPanelState extends State<_ChatPanel> {
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
-                  onTap: _isSending ? null : _send,
+                  onTap: _isSending ? null : () {
+                    AudioManager().playClick();
+                    _send();
+                  },
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(

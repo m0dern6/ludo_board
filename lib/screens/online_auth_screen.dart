@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/colors.dart';
 import '../models/online_models.dart';
+import '../services/audio_manager.dart';
 import '../services/auth_service.dart';
 import 'online_lobby_screen.dart';
 
@@ -168,7 +169,10 @@ class _SignInView extends StatelessWidget {
               const CircularProgressIndicator(color: GameColors.red)
             else
               ElevatedButton.icon(
-                onPressed: onSignIn,
+                onPressed: () {
+                  AudioManager().playClick();
+                  onSignIn();
+                },
                 icon: const Icon(Icons.login, size: 20, color: Colors.blue),
                 label: const Text('Sign in with Google'),
                 style: ElevatedButton.styleFrom(
@@ -275,7 +279,10 @@ class _ProfileSetup extends StatelessWidget {
             itemBuilder: (_, i) {
               final selected = i == selectedAvatar;
               return GestureDetector(
-                onTap: () => onAvatarSelected(i),
+                onTap: () {
+                  AudioManager().playClick();
+                  onAvatarSelected(i);
+                },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   decoration: BoxDecoration(
@@ -305,7 +312,10 @@ class _ProfileSetup extends StatelessWidget {
           ],
 
           ElevatedButton(
-            onPressed: isLoading ? null : onSave,
+            onPressed: isLoading ? null : () {
+              AudioManager().playClick();
+              onSave();
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: GameColors.red,
               minimumSize: const Size(double.infinity, 54),

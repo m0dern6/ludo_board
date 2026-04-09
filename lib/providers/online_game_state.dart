@@ -69,7 +69,9 @@ class OnlineGameState extends GameState {
   // Remote state application
   // ──────────────────────────────────────────────
 
-  void _onRemoteGameUpdate(DatabaseEvent event) {
+  bool _isApplyingRemoteState = false;
+
+  Future<void> _onRemoteGameUpdate(DatabaseEvent event) async {
     if (_skipNextRemoteUpdate) {
       _skipNextRemoteUpdate = false;
       return;
@@ -77,7 +79,16 @@ class OnlineGameState extends GameState {
     final data = event.snapshot.value as Map<dynamic, dynamic>?;
     if (data == null) return;
 
-    _applyRemoteState(data);
+    // Skip if currently animating a remote move; Firebase RTDB will
+    // re-emit the latest state when the subscription catches up.
+    if (_isApplyingRemoteState) return;
+
+    _isApplyingRemoteState = true;
+    try {
+      await _applyRemoteState(data);
+    } finally {
+      _isApplyingRemoteState = false;
+    }
 
     // If it's now an AI turn and we're the host, drive it.
     if (isHost && playerModes[currentPlayer] == PlayerMode.ai) {
@@ -122,7 +133,7 @@ class OnlineGameState extends GameState {
     _knownPlayerNames = current;
   }
 
-  void _applyRemoteState(Map<dynamic, dynamic> data) {
+  Future<void> _applyRemoteState(Map<dynamic, dynamic> data) async {
     // Current player
     final cpStr = data['currentPlayer'] as String? ?? 'red';
     currentPlayer = PlayerType.values.firstWhere(
@@ -165,14 +176,103 @@ class OnlineGameState extends GameState {
       }
     }
 
-    // Pieces
+    // Pieces – detect if one piece moved forward (animate it step-by-step)
     final rawPieces = data['pieces'] as Map<dynamic, dynamic>?;
     if (rawPieces != null) {
+      // Build a map of new positions
+      final Map<String, int> newPositions = {};
+      for (final entry in rawPieces.entries) {
+        final key = entry.key as String;
+        final pieceData = entry.value as Map<dynamic, dynamic>?;
+        if (pieceData != null) {
+          newPositions[key] = (pieceData['progress'] as num?)?.toInt() ?? -1;
+        }
+      }
+
+      // Find the piece that moved forward (candidate for step-by-step animation).
+      // Only animate moves of 1–6 steps from an on-board position, or an
+      // unlock from base (-1 → 0).
+      PieceModel? pieceToAnimate;
+      int? animateTarget;
+
       for (final p in pieces) {
         final key = '${p.type.name}_${p.id}';
-        final pieceData = rawPieces[key] as Map<dynamic, dynamic>?;
-        if (pieceData != null) {
-          p.progress = (pieceData['progress'] as num?)?.toInt() ?? -1;
+        final newProg = newPositions[key];
+        if (newProg == null || newProg == p.progress) continue;
+
+        final diff = newProg - p.progress;
+        if (p.progress == -1 && newProg == 0) {
+          pieceToAnimate = p;
+          animateTarget = 0;
+          break;
+        } else if (diff > 0 && diff <= 6 && p.progress >= 0) {
+          pieceToAnimate = p;
+          animateTarget = newProg;
+          break;
+        }
+      }
+
+      if (pieceToAnimate != null && animateTarget != null) {
+        // Apply all other piece changes immediately (captures etc.)
+        for (final p in pieces) {
+          if (p == pieceToAnimate) continue;
+          final key = '${p.type.name}_${p.id}';
+          final newProg = newPositions[key];
+          if (newProg != null) p.progress = newProg;
+        }
+
+        if (!_initialized) {
+          _initialized = true;
+          isMatchActive = true;
+        }
+        _recalcMovablePieces();
+        notifyListeners();
+
+        // Animate the moving piece
+        if (pieceToAnimate.progress == -1 && animateTarget == 0) {
+          // Unlock from base
+          pieceToAnimate.progress = 0;
+          AudioManager().playMove();
+          notifyListeners();
+          await Future.delayed(const Duration(milliseconds: 250));
+        } else {
+          final startProg = pieceToAnimate.progress;
+          for (int i = startProg + 1; i <= animateTarget!; i++) {
+            if (!isMatchActive) {
+              // Match ended mid-animation – snap to final positions immediately.
+              for (final p in pieces) {
+                final key = '${p.type.name}_${p.id}';
+                final newProg = newPositions[key];
+                if (newProg != null) p.progress = newProg;
+              }
+              notifyListeners();
+              return;
+            }
+            pieceToAnimate.progress = i;
+            AudioManager().playMove();
+            notifyListeners();
+            await Future.delayed(const Duration(milliseconds: 250));
+          }
+        }
+
+        // After animation, reconcile final positions (handles captures that
+        // occurred at the destination).
+        bool caughtSomeone = false;
+        for (final p in pieces) {
+          final key = '${p.type.name}_${p.id}';
+          final newProg = newPositions[key];
+          if (newProg != null && newProg != p.progress) {
+            if (newProg == -1 && p.progress >= 0) caughtSomeone = true;
+            p.progress = newProg;
+          }
+        }
+        if (caughtSomeone) AudioManager().playCapture();
+      } else {
+        // No animated piece – apply all positions directly.
+        for (final p in pieces) {
+          final key = '${p.type.name}_${p.id}';
+          final newProg = newPositions[key];
+          if (newProg != null) p.progress = newProg;
         }
       }
     }
@@ -314,6 +414,9 @@ class OnlineGameState extends GameState {
 
     if (piece.progress == -1) {
       piece.progress = 0;
+      AudioManager().playMove();
+      notifyListeners();
+      await Future.delayed(const Duration(milliseconds: 250));
     } else {
       for (int i = 0; i < diceValue; i++) {
         if (!isMatchActive) return;
