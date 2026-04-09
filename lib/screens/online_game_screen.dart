@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../constants/colors.dart';
@@ -35,35 +36,32 @@ class OnlineGameScreen extends StatefulWidget {
 class _OnlineGameScreenState extends State<OnlineGameScreen> {
   late final OnlineGameState _gameState;
   bool _chatOpen = false;
-
-  // Chat bubble state: active message per player color.
-  final Map<PlayerType, String?> _activeBubbles = {
-    PlayerType.red: null,
-    PlayerType.green: null,
-    PlayerType.yellow: null,
-    PlayerType.blue: null,
-  };
-  final Map<PlayerType, Timer?> _bubbleTimers = {};
+  int _unreadChatCount = 0;
+  bool _badgePulse = false;
+  bool _chatInitialized = false;
+  String? _lastSeenChatId;
+  String? _latestChatId;
+  Timer? _badgePulseTimer;
 
   StreamSubscription<DatabaseEvent>? _chatSub;
 
-  // Maps uid → PlayerType for resolving chat sender colors.
-  late final Map<String, PlayerType> _uidToColor;
+  void _enableImmersiveMode() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  void _restoreSystemUi() {
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
+    _enableImmersiveMode();
     final room = widget.initialRoom;
     final isHost = room.hostUid == widget.localUid;
-
-    // Build uid → color map from room players.
-    _uidToColor = {
-      for (final p in room.players.values)
-        p.uid: PlayerType.values.firstWhere(
-          (t) => t.name == p.color,
-          orElse: () => PlayerType.red,
-        ),
-    };
 
     // Determine local player color
     final localPlayer = room.players[widget.localUid];
@@ -84,10 +82,8 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
 
     AudioManager().stopBgm();
 
-    // Listen to chat for in-game bubble notifications.
-    _chatSub = ChatService()
-        .chatStream(widget.roomCode)
-        .listen(_onChatEvent);
+    // Listen to chat for unread count updates.
+    _chatSub = ChatService().chatStream(widget.roomCode).listen(_onChatEvent);
   }
 
   void _onGameStateChanged() {
@@ -115,36 +111,97 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
   }
 
   void _onChatEvent(DatabaseEvent event) {
-    // Parse the latest message and show a bubble for 3 seconds.
     try {
       final msgs = ChatService().parseChatMessages(event.snapshot.value);
       if (msgs.isEmpty) return;
       final latest = msgs.last;
-      final color = _uidToColor[latest.uid];
-      if (color == null) return;
 
-      _bubbleTimers[color]?.cancel();
-      setState(() => _activeBubbles[color] = latest.text);
-      _bubbleTimers[color] = Timer(const Duration(seconds: 3), () {
-        if (mounted) setState(() => _activeBubbles[color] = null);
-      });
+      _latestChatId = latest.id;
+
+      // Seed baseline on first load so historical messages are not counted.
+      if (!_chatInitialized) {
+        _chatInitialized = true;
+        _lastSeenChatId = latest.id;
+        return;
+      }
+
+      if (_chatOpen) {
+        if (_unreadChatCount != 0 || _lastSeenChatId != latest.id) {
+          setState(() {
+            _unreadChatCount = 0;
+            _lastSeenChatId = latest.id;
+          });
+        }
+        return;
+      }
+
+      final unread = _countUnreadSinceLastSeen(msgs);
+      if (unread != _unreadChatCount) {
+        if (unread > _unreadChatCount) {
+          _triggerBadgePulse();
+        }
+        setState(() => _unreadChatCount = unread);
+      }
     } catch (_) {}
+  }
+
+  void _triggerBadgePulse() {
+    _badgePulseTimer?.cancel();
+    setState(() => _badgePulse = true);
+    _badgePulseTimer = Timer(const Duration(milliseconds: 260), () {
+      if (mounted) {
+        setState(() => _badgePulse = false);
+      }
+    });
+  }
+
+  int _countUnreadSinceLastSeen(List<ChatMessage> msgs) {
+    if (msgs.isEmpty) return 0;
+
+    int startIndex = 0;
+    if (_lastSeenChatId != null) {
+      final i = msgs.lastIndexWhere((m) => m.id == _lastSeenChatId);
+      if (i != -1) {
+        startIndex = i + 1;
+      }
+    }
+
+    int count = 0;
+    for (int i = startIndex; i < msgs.length; i++) {
+      if (msgs[i].uid != widget.localUid) count++;
+    }
+    return count;
   }
 
   @override
   void dispose() {
     _gameState.removeListener(_onGameStateChanged);
     _gameState.quitMatch();
-    for (final t in _bubbleTimers.values) {
-      t?.cancel();
-    }
+    _badgePulseTimer?.cancel();
     _chatSub?.cancel();
     AudioManager().stopAllSfx();
     AudioManager().startBgm();
+    _restoreSystemUi();
     super.dispose();
   }
 
-  void _toggleChat() => setState(() => _chatOpen = !_chatOpen);
+  void _toggleChat() {
+    setState(() => _chatOpen = !_chatOpen);
+    if (_chatOpen) {
+      _markChatAsRead();
+    }
+  }
+
+  void _markChatAsRead() {
+    final latestId = _latestChatId;
+    if (latestId == null) return;
+    if (_unreadChatCount != 0 || _lastSeenChatId != latestId) {
+      setState(() {
+        _unreadChatCount = 0;
+        _lastSeenChatId = latestId;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -167,6 +224,8 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
                   roomCode: widget.roomCode,
                   onChatToggle: _toggleChat,
                   chatOpen: _chatOpen,
+                  unreadCount: _unreadChatCount,
+                  pulseBadge: _badgePulse,
                 ),
                 const Spacer(),
                 Padding(
@@ -180,15 +239,11 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
                             player: PlayerType.red,
                             textAtTop: true,
                             localColor: _gameState.localColor,
-                            chatMessage: _activeBubbles[PlayerType.red],
-                            bubbleBelow: true,
                           ),
                           _CornerArea(
                             player: PlayerType.green,
                             textAtTop: true,
                             localColor: _gameState.localColor,
-                            chatMessage: _activeBubbles[PlayerType.green],
-                            bubbleBelow: true,
                           ),
                         ],
                       ),
@@ -202,15 +257,11 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
                             player: PlayerType.blue,
                             textAtTop: false,
                             localColor: _gameState.localColor,
-                            chatMessage: _activeBubbles[PlayerType.blue],
-                            bubbleBelow: false,
                           ),
                           _CornerArea(
                             player: PlayerType.yellow,
                             textAtTop: false,
                             localColor: _gameState.localColor,
-                            chatMessage: _activeBubbles[PlayerType.yellow],
-                            bubbleBelow: false,
                           ),
                         ],
                       ),
@@ -253,11 +304,15 @@ class _OnlineHeader extends StatelessWidget {
   final String roomCode;
   final VoidCallback onChatToggle;
   final bool chatOpen;
+  final int unreadCount;
+  final bool pulseBadge;
 
   const _OnlineHeader({
     required this.roomCode,
     required this.onChatToggle,
     required this.chatOpen,
+    required this.unreadCount,
+    required this.pulseBadge,
   });
 
   @override
@@ -319,10 +374,55 @@ class _OnlineHeader extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      chatOpen ? Icons.chat : Icons.chat_bubble_outline,
-                      color: chatOpen ? GameColors.blue : Colors.black87,
-                      size: 20,
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          chatOpen ? Icons.chat : Icons.chat_bubble_outline,
+                          color: chatOpen ? GameColors.blue : Colors.black87,
+                          size: 20,
+                        ),
+                        if (!chatOpen && unreadCount > 0)
+                          Positioned(
+                            right: -10,
+                            top: -8,
+                            child: AnimatedScale(
+                              scale: pulseBadge ? 1.24 : 1.0,
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeOutBack,
+                              child: Container(
+                                constraints: const BoxConstraints(
+                                  minWidth: 18,
+                                  minHeight: 18,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: GameColors.red,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Text(
+                                  unreadCount > 99
+                                      ? '99+'
+                                      : unreadCount.toString(),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -352,89 +452,19 @@ class _CornerArea extends StatelessWidget {
   final PlayerType player;
   final bool textAtTop;
   final PlayerType localColor;
-  final String? chatMessage;
-  /// When true the bubble is placed below the dice; otherwise above it.
-  final bool bubbleBelow;
 
   const _CornerArea({
     required this.player,
     required this.textAtTop,
     required this.localColor,
-    required this.chatMessage,
-    required this.bubbleBelow,
   });
 
   @override
   Widget build(BuildContext context) {
-    final Color bubbleColor;
-    switch (player) {
-      case PlayerType.red:    bubbleColor = GameColors.red;    break;
-      case PlayerType.green:  bubbleColor = GameColors.green;  break;
-      case PlayerType.yellow: bubbleColor = GameColors.yellow; break;
-      case PlayerType.blue:   bubbleColor = GameColors.blue;   break;
-    }
-
-    final dice = _OnlineCornerDice(
+    return _OnlineCornerDice(
       player: player,
       textAtTop: textAtTop,
       localColor: localColor,
-    );
-
-    if (chatMessage == null) return dice;
-
-    // Use Stack with Clip.none so the bubble floats outside the dice area
-    // without affecting the layout height (prevents the board from shifting).
-    final bool isRightAligned =
-        player == PlayerType.green || player == PlayerType.yellow;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        dice,
-        Positioned(
-          top: bubbleBelow ? null : -36,
-          bottom: bubbleBelow ? -36 : null,
-          left: isRightAligned ? null : 0,
-          right: isRightAligned ? 0 : null,
-          child: _ChatBubble(message: chatMessage, color: bubbleColor),
-        ),
-      ],
-    );
-  }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Chat bubble overlay (shown for 3 seconds after a player sends a message)
-// ──────────────────────────────────────────────────────────────────────────────
-
-class _ChatBubble extends StatelessWidget {
-  final String? message;
-  final Color color;
-
-  const _ChatBubble({this.message, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    if (message == null) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(top: 2, bottom: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      constraints: const BoxConstraints(maxWidth: 130),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
-        border: Border.all(color: color.withOpacity(0.4), width: 1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        message!,
-        style: TextStyle(
-          fontSize: 11,
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
     );
   }
 }
@@ -495,9 +525,12 @@ class _OnlineQuitButton extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40),
         child: ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             AudioManager().playClick();
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            await OnlineService().leaveRoom(roomCode, localUid);
+            if (context.mounted) {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
@@ -694,7 +727,7 @@ class _ChatPanelState extends State<_ChatPanel> {
       ),
       child: Column(
         children: [
-        // Handle bar + header row
+          // Handle bar + header row
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
             child: Row(
@@ -873,10 +906,12 @@ class _ChatPanelState extends State<_ChatPanel> {
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
-                  onTap: _isSending ? null : () {
-                    AudioManager().playClick();
-                    _send();
-                  },
+                  onTap: _isSending
+                      ? null
+                      : () {
+                          AudioManager().playClick();
+                          _send();
+                        },
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
