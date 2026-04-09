@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/colors.dart';
 import '../models/online_models.dart';
+import '../models/piece_model.dart';
 import '../services/online_service.dart';
 import 'online_game_screen.dart';
 
@@ -42,6 +43,8 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
     'blue': GameColors.blue,
   };
 
+  static const _allColors = ['red', 'green', 'yellow', 'blue'];
+
   Future<void> _startMatch(Map<String, OnlinePlayer> players) async {
     setState(() {
       _isStarting = true;
@@ -56,6 +59,43 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
         _error = 'Failed to start: $e';
       });
     }
+  }
+
+  Future<void> _toggleFillWithAi(GameRules currentRules) async {
+    final updated = GameRules(
+      rediceOnOne: currentRules.rediceOnOne,
+      mustKillToEnterHome: currentRules.mustKillToEnterHome,
+      quickMode: currentRules.quickMode,
+      fillWithAi: !currentRules.fillWithAi,
+    );
+    try {
+      await _svc.updateRules(widget.roomCode, updated);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not update rules: $e');
+    }
+  }
+
+  /// Returns the list of colors the local player may pick.
+  /// - 2 players: can pick any of the 4 colors (the other auto-follows diagonal).
+  /// - 3+ players: all colors not already taken by others.
+  List<String> _availableColors(Map<String, OnlinePlayer> players, String localColor) {
+    if (players.length == 2) {
+      return _allColors;
+    }
+    final taken = players.values
+        .where((p) => p.uid != widget.localUid)
+        .map((p) => p.color)
+        .toSet();
+    return _allColors.where((c) => c == localColor || !taken.contains(c)).toList();
+  }
+
+  Future<void> _changeColor(String newColor) async {
+    final err = await _svc.changePlayerColor(
+      code: widget.roomCode,
+      uid: widget.localUid,
+      newColor: newColor,
+    );
+    if (err != null && mounted) setState(() => _error = err);
   }
 
   Future<void> _leaveRoom() async {
@@ -117,6 +157,9 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
 
             final isHost = room.hostUid == widget.localUid;
             final players = room.players;
+            final localPlayer = players[widget.localUid];
+            final localColor = localPlayer?.color ?? 'red';
+            final availableColors = _availableColors(players, localColor);
 
             return SafeArea(
               child: Padding(
@@ -146,6 +189,8 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
                         isHost: p.uid == room.hostUid,
                         colorLabel: _colorNames[p.color] ?? p.color,
                         color: _colorMap[p.color] ?? GameColors.red,
+                        availableColors: p.uid == widget.localUid ? availableColors : null,
+                        onColorChange: p.uid == widget.localUid ? _changeColor : null,
                       ),
                     ),
 
@@ -155,6 +200,15 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
                     }),
 
                     const Spacer(),
+
+                    // AI fill toggle (host only, when there are empty slots)
+                    if (isHost && players.length < 4) ...[
+                      _AiFillToggle(
+                        fillWithAi: room.rules.fillWithAi,
+                        onToggle: () => _toggleFillWithAi(room.rules),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
 
                     if (_error != null)
                       Padding(
@@ -192,7 +246,9 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
                                   ),
                                   if (players.length < 4)
                                     Text(
-                                      'Empty slots will be filled by AI',
+                                      room.rules.fillWithAi
+                                          ? 'Empty slots will be filled by AI'
+                                          : 'Playing with ${players.length} player(s) only',
                                       style: TextStyle(
                                         color: Colors.white.withOpacity(0.8),
                                         fontSize: 11,
@@ -303,6 +359,9 @@ class _PlayerTile extends StatelessWidget {
   final bool isHost;
   final String colorLabel;
   final Color color;
+  /// Colors the local player may switch to. Null means no color picker shown.
+  final List<String>? availableColors;
+  final Future<void> Function(String)? onColorChange;
 
   const _PlayerTile({
     required this.player,
@@ -310,7 +369,16 @@ class _PlayerTile extends StatelessWidget {
     required this.isHost,
     required this.colorLabel,
     required this.color,
+    this.availableColors,
+    this.onColorChange,
   });
+
+  static const _colorMap = {
+    'red': GameColors.red,
+    'green': GameColors.green,
+    'yellow': GameColors.yellow,
+    'blue': GameColors.blue,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -324,61 +392,113 @@ class _PlayerTile extends StatelessWidget {
             ? Border.all(color: color.withOpacity(0.4), width: 2)
             : null,
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(avatarEmoji(player.avatar),
-              style: const TextStyle(fontSize: 28)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Text(avatarEmoji(player.avatar),
+                  style: const TextStyle(fontSize: 28)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      player.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    Row(
+                      children: [
+                        Text(
+                          player.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        if (isLocalPlayer) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'YOU',
+                              style: TextStyle(
+                                  color: color,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                        if (isHost) ...[
+                          const SizedBox(width: 6),
+                          const Icon(Icons.star, color: GameColors.yellow, size: 14),
+                        ],
+                      ],
                     ),
-                    if (isLocalPlayer) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'YOU',
-                          style: TextStyle(
-                              color: color,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                    if (isHost) ...[
-                      const SizedBox(width: 6),
-                      const Icon(Icons.star, color: GameColors.yellow, size: 14),
-                    ],
+                    Text(
+                      colorLabel,
+                      style: TextStyle(
+                          color: color, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
                   ],
                 ),
-                Text(
-                  colorLabel,
-                  style: TextStyle(
-                      color: color, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: player.isOnline ? GameColors.green : Colors.grey.shade400,
+                  shape: BoxShape.circle,
                 ),
+              ),
+            ],
+          ),
+          // Color picker for the local player
+          if (isLocalPlayer && availableColors != null && onColorChange != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text(
+                  'Change color:',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ...availableColors!.map((c) {
+                  final isSelected = c == player.color;
+                  final col = _colorMap[c] ?? GameColors.red;
+                  return GestureDetector(
+                    onTap: isSelected ? null : () => onColorChange!(c),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.only(right: 6),
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: col,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? Colors.black54 : Colors.transparent,
+                          width: isSelected ? 2.5 : 0,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: col.withOpacity(0.35),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                      child: isSelected
+                          ? const Icon(Icons.check,
+                              size: 14, color: Colors.white)
+                          : null,
+                    ),
+                  );
+                }),
               ],
             ),
-          ),
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: player.isOnline ? GameColors.green : Colors.grey.shade400,
-              shape: BoxShape.circle,
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -406,6 +526,70 @@ class _EmptySlotTile extends StatelessWidget {
           Text(
             'Waiting for player…',
             style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// AI fill toggle (host-only, shown when there are empty slots)
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _AiFillToggle extends StatelessWidget {
+  final bool fillWithAi;
+  final VoidCallback onToggle;
+
+  const _AiFillToggle({required this.fillWithAi, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: fillWithAi
+              ? GameColors.green.withOpacity(0.3)
+              : Colors.grey.shade200,
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            fillWithAi ? Icons.smart_toy_outlined : Icons.people_outline,
+            color: fillWithAi ? GameColors.green : Colors.grey,
+            size: 22,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Fill empty slots with AI',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: fillWithAi ? Colors.black87 : Colors.grey,
+                  ),
+                ),
+                Text(
+                  fillWithAi
+                      ? 'AI will play for empty slots'
+                      : 'Only joined players will play',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: fillWithAi,
+            onChanged: (_) => onToggle(),
+            activeColor: GameColors.green,
           ),
         ],
       ),

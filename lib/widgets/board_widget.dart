@@ -4,6 +4,7 @@ import '../constants/colors.dart';
 import '../constants/path_constants.dart';
 import '../providers/game_state.dart';
 import '../models/piece_model.dart';
+import '../models/online_models.dart';
 
 class LudoBoard extends StatelessWidget {
   const LudoBoard({super.key});
@@ -214,7 +215,22 @@ class _BaseWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    bool isRoyal = Provider.of<GameState>(context).currentTheme == BoardTheme.royal;
+    final state = Provider.of<GameState>(context);
+    bool isRoyal = state.currentTheme == BoardTheme.royal;
+
+    // Player display info (populated by OnlineGameState for human online players)
+    final String? displayName = state.playerDisplayNames[type];
+    final int? displayAvatar = state.playerDisplayAvatars[type];
+
+    // Determine which corner of the base the label sits in.
+    AlignmentGeometry labelAlignment;
+    CrossAxisAlignment labelCrossAxis;
+    switch (type) {
+      case PlayerType.red:    labelAlignment = Alignment.topLeft;     labelCrossAxis = CrossAxisAlignment.start; break;
+      case PlayerType.green:  labelAlignment = Alignment.topRight;    labelCrossAxis = CrossAxisAlignment.end;   break;
+      case PlayerType.yellow: labelAlignment = Alignment.bottomRight; labelCrossAxis = CrossAxisAlignment.end;   break;
+      case PlayerType.blue:   labelAlignment = Alignment.bottomLeft;  labelCrossAxis = CrossAxisAlignment.start; break;
+    }
     
     return Positioned(
       left: c * cellSize,
@@ -264,6 +280,46 @@ class _BaseWidget extends StatelessWidget {
                   child: Text(
                     _getRankText(rank),
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                  ),
+                ),
+              ),
+            // Player avatar + name overlay (online games only)
+            if (displayName != null && displayAvatar != null)
+              Align(
+                alignment: labelAlignment,
+                child: Container(
+                  margin: EdgeInsets.all(cellSize * 0.18),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: cellSize * 0.22,
+                    vertical: cellSize * 0.12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.82),
+                    borderRadius: BorderRadius.circular(cellSize * 0.4),
+                    boxShadow: [
+                      BoxShadow(color: color.withOpacity(0.25), blurRadius: 4),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: labelCrossAxis,
+                    children: [
+                      Text(
+                        kAvatarEmojis[displayAvatar.clamp(0, kAvatarEmojis.length - 1)],
+                        style: TextStyle(fontSize: cellSize * 0.55),
+                      ),
+                      Text(
+                        displayName.length > 8
+                            ? '${displayName.substring(0, 7)}…'
+                            : displayName,
+                        style: TextStyle(
+                          fontSize: cellSize * 0.32,
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
               ),

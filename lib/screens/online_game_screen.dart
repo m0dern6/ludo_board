@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -34,11 +36,34 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
   late final OnlineGameState _gameState;
   bool _chatOpen = false;
 
+  // Chat bubble state: active message per player color.
+  final Map<PlayerType, String?> _activeBubbles = {
+    PlayerType.red: null,
+    PlayerType.green: null,
+    PlayerType.yellow: null,
+    PlayerType.blue: null,
+  };
+  final Map<PlayerType, Timer?> _bubbleTimers = {};
+
+  StreamSubscription<DatabaseEvent>? _chatSub;
+
+  // Maps uid → PlayerType for resolving chat sender colors.
+  late final Map<String, PlayerType> _uidToColor;
+
   @override
   void initState() {
     super.initState();
     final room = widget.initialRoom;
     final isHost = room.hostUid == widget.localUid;
+
+    // Build uid → color map from room players.
+    _uidToColor = {
+      for (final p in room.players.values)
+        p.uid: PlayerType.values.firstWhere(
+          (t) => t.name == p.color,
+          orElse: () => PlayerType.red,
+        ),
+    };
 
     // Determine local player color
     final localPlayer = room.players[widget.localUid];
@@ -55,13 +80,65 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
       roomPlayers: room.players,
     );
     _gameState.initFromRoom(room.players, room.rules);
+    _gameState.addListener(_onGameStateChanged);
 
     AudioManager().stopBgm();
+
+    // Listen to chat for in-game bubble notifications.
+    _chatSub = ChatService()
+        .chatStream(widget.roomCode)
+        .listen(_onChatEvent);
+  }
+
+  void _onGameStateChanged() {
+    final msg = _gameState.playerLeftMessage;
+    if (msg != null) {
+      _gameState.clearPlayerLeftMessage();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.exit_to_app, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Text(msg),
+                ],
+              ),
+              backgroundColor: Colors.black87,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      });
+    }
+  }
+
+  void _onChatEvent(DatabaseEvent event) {
+    // Parse the latest message and show a bubble for 3 seconds.
+    try {
+      final msgs = ChatService().parseChatMessages(event.snapshot.value);
+      if (msgs.isEmpty) return;
+      final latest = msgs.last;
+      final color = _uidToColor[latest.uid];
+      if (color == null) return;
+
+      _bubbleTimers[color]?.cancel();
+      setState(() => _activeBubbles[color] = latest.text);
+      _bubbleTimers[color] = Timer(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _activeBubbles[color] = null);
+      });
+    } catch (_) {}
   }
 
   @override
   void dispose() {
+    _gameState.removeListener(_onGameStateChanged);
     _gameState.quitMatch();
+    for (final t in _bubbleTimers.values) {
+      t?.cancel();
+    }
+    _chatSub?.cancel();
     AudioManager().stopAllSfx();
     AudioManager().startBgm();
     super.dispose();
@@ -99,15 +176,19 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _OnlineCornerDice(
+                          _CornerArea(
                             player: PlayerType.red,
                             textAtTop: true,
                             localColor: _gameState.localColor,
+                            chatMessage: _activeBubbles[PlayerType.red],
+                            bubbleBelow: true,
                           ),
-                          _OnlineCornerDice(
+                          _CornerArea(
                             player: PlayerType.green,
                             textAtTop: true,
                             localColor: _gameState.localColor,
+                            chatMessage: _activeBubbles[PlayerType.green],
+                            bubbleBelow: true,
                           ),
                         ],
                       ),
@@ -117,15 +198,19 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _OnlineCornerDice(
+                          _CornerArea(
                             player: PlayerType.blue,
                             textAtTop: false,
                             localColor: _gameState.localColor,
+                            chatMessage: _activeBubbles[PlayerType.blue],
+                            bubbleBelow: false,
                           ),
-                          _OnlineCornerDice(
+                          _CornerArea(
                             player: PlayerType.yellow,
                             textAtTop: false,
                             localColor: _gameState.localColor,
+                            chatMessage: _activeBubbles[PlayerType.yellow],
+                            bubbleBelow: false,
                           ),
                         ],
                       ),
@@ -241,6 +326,89 @@ class _OnlineHeader extends StatelessWidget {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Corner area: dice + chat bubble
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _CornerArea extends StatelessWidget {
+  final PlayerType player;
+  final bool textAtTop;
+  final PlayerType localColor;
+  final String? chatMessage;
+  /// When true the bubble is placed below the dice; otherwise above it.
+  final bool bubbleBelow;
+
+  const _CornerArea({
+    required this.player,
+    required this.textAtTop,
+    required this.localColor,
+    required this.chatMessage,
+    required this.bubbleBelow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bubbleColor;
+    switch (player) {
+      case PlayerType.red:    bubbleColor = GameColors.red;    break;
+      case PlayerType.green:  bubbleColor = GameColors.green;  break;
+      case PlayerType.yellow: bubbleColor = GameColors.yellow; break;
+      case PlayerType.blue:   bubbleColor = GameColors.blue;   break;
+    }
+
+    final dice = _OnlineCornerDice(
+      player: player,
+      textAtTop: textAtTop,
+      localColor: localColor,
+    );
+    final bubble = _ChatBubble(message: chatMessage, color: bubbleColor);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: player == PlayerType.green || player == PlayerType.yellow
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      children: bubbleBelow ? [dice, bubble] : [bubble, dice],
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Chat bubble overlay (shown for 3 seconds after a player sends a message)
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _ChatBubble extends StatelessWidget {
+  final String? message;
+  final Color color;
+
+  const _ChatBubble({this.message, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    if (message == null) return const SizedBox(height: 4);
+    return Container(
+      margin: const EdgeInsets.only(top: 2, bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      constraints: const BoxConstraints(maxWidth: 130),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.14),
+        border: Border.all(color: color.withOpacity(0.4), width: 1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        message!,
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Online-aware dice widget (only tappable for local player's turn)
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -259,6 +427,7 @@ class _OnlineCornerDice extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = Provider.of<GameState>(context);
     final bool isMyTurn = state.currentPlayer == player;
+    final bool isLocalPlayer = player == localColor;
 
     // Hide if not current player's turn
     return Opacity(
@@ -267,9 +436,12 @@ class _OnlineCornerDice extends StatelessWidget {
         // Only interactive when it's LOCAL player's turn (or AI handled by host)
         ignoring:
             !isMyTurn ||
-            (player != localColor &&
-                state.playerModes[player] != PlayerMode.ai),
-        child: CornerDice(player: player, textAtTop: textAtTop),
+            (!isLocalPlayer && state.playerModes[player] != PlayerMode.ai),
+        child: CornerDice(
+          player: player,
+          textAtTop: textAtTop,
+          isLocalPlayer: isLocalPlayer,
+        ),
       ),
     );
   }
