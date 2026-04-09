@@ -18,13 +18,13 @@ class OnlinePlayer {
   });
 
   Map<String, dynamic> toMap() => {
-        'uid': uid,
-        'name': name,
-        'avatar': avatar,
-        'color': color,
-        'isAi': isAi,
-        'isOnline': isOnline,
-      };
+    'uid': uid,
+    'name': name,
+    'avatar': avatar,
+    'color': color,
+    'isAi': isAi,
+    'isOnline': isOnline,
+  };
 
   factory OnlinePlayer.fromMap(String uid, Map<dynamic, dynamic> map) =>
       OnlinePlayer(
@@ -56,26 +56,28 @@ class OnlineRoom {
 
   factory OnlineRoom.fromMap(String code, Map<dynamic, dynamic> map) {
     final rawPlayers = map['players'] as Map<dynamic, dynamic>? ?? {};
-    final players = rawPlayers.map<String, OnlinePlayer>(
-      (k, v) => MapEntry(
-        k as String,
-        OnlinePlayer.fromMap(k as String, v as Map<dynamic, dynamic>),
-      ),
-    );
+    final players = rawPlayers.map<String, OnlinePlayer>((k, v) {
+      final uid = k.toString();
+      return MapEntry(
+        uid,
+        OnlinePlayer.fromMap(uid, v as Map<dynamic, dynamic>),
+      );
+    });
     return OnlineRoom(
       code: code,
       hostUid: map['host'] as String? ?? '',
       status: map['status'] as String? ?? 'waiting',
       players: players,
       rules: GameRules.fromJson(
-          (map['rules'] as Map<dynamic, dynamic>?)?.cast<String, dynamic>() ??
-              {}),
+        (map['rules'] as Map<dynamic, dynamic>?)?.cast<String, dynamic>() ?? {},
+      ),
       createdAt: (map['createdAt'] as num?)?.toInt() ?? 0,
     );
   }
 }
 
 class ChatMessage {
+  final String id;
   final String uid;
   final String name;
   final int avatar;
@@ -83,6 +85,7 @@ class ChatMessage {
   final int timestamp;
 
   ChatMessage({
+    this.id = '',
     required this.uid,
     required this.name,
     required this.avatar,
@@ -90,7 +93,9 @@ class ChatMessage {
     required this.timestamp,
   });
 
-  factory ChatMessage.fromMap(Map<dynamic, dynamic> map) => ChatMessage(
+  factory ChatMessage.fromMap(Map<dynamic, dynamic> map, {String id = ''}) =>
+      ChatMessage(
+        id: id,
         uid: map['uid'] as String? ?? '',
         name: map['name'] as String? ?? 'Player',
         avatar: (map['avatar'] as num?)?.toInt() ?? 0,
