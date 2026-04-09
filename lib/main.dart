@@ -353,7 +353,10 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          AudioManager().playClick();
+          onTap();
+        },
         behavior: HitTestBehavior.opaque,
         child: AnimatedScale(
           duration: const Duration(milliseconds: 200),
@@ -468,7 +471,10 @@ class _MenuButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        AudioManager().playClick();
+        onTap();
+      },
       borderRadius: BorderRadius.circular(20),
       child: Container(
         height: 100,
@@ -593,6 +599,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                   Color c = _getColor(type);
                   return GestureDetector(
                     onTap: () {
+                      AudioManager().playClick();
                       setState(() {
                         _selectedColor = type;
                         for (var t in PlayerType.values) {
@@ -654,7 +661,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     Color pColor = _getColor(type);
 
                     return GestureDetector(
-                      onTap: () => _toggleRole(type),
+                      onTap: () {
+                        AudioManager().playClick();
+                        _toggleRole(type);
+                      },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
                         curve: Curves.easeInOut,
@@ -727,6 +737,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
+                AudioManager().playClick();
                 final state = Provider.of<GameState>(context, listen: false);
                 state.setupGame(modes: _playerModes, gameRules: state.rules);
                 Navigator.push(
@@ -941,7 +952,10 @@ class _ResetButton extends StatelessWidget {
     final state = Provider.of<GameState>(context);
     if (state.status != GameStatus.finished) {
       return TextButton.icon(
-        onPressed: () => _confirmQuit(context),
+        onPressed: () {
+          AudioManager().playClick();
+          _confirmQuit(context);
+        },
         icon: const Icon(Icons.arrow_back, color: Colors.grey),
         label: const Text(
           "QUIT MATCH",
@@ -953,7 +967,10 @@ class _ResetButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40),
       child: ElevatedButton(
-        onPressed: () => state.resetGame(),
+        onPressed: () {
+          AudioManager().playClick();
+          state.resetGame();
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: GameColors.red,
@@ -1003,7 +1020,10 @@ class _ResetButton extends StatelessWidget {
             children: [
               Expanded(
                 child: TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    AudioManager().playClick();
+                    Navigator.pop(context);
+                  },
                   child: const Text(
                     "STAY",
                     style: TextStyle(
@@ -1016,8 +1036,10 @@ class _ResetButton extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () =>
-                      Navigator.of(context).popUntil((route) => route.isFirst),
+                  onPressed: () {
+                    AudioManager().playClick();
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: GameColors.red,
                     shape: RoundedRectangleBorder(
@@ -1073,7 +1095,10 @@ class _HeaderSection extends StatelessWidget {
             ],
           ),
           IconButton(
-            onPressed: () => _showPauseMenu(context),
+            onPressed: () {
+              AudioManager().playClick();
+              _showPauseMenu(context);
+            },
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -1152,7 +1177,10 @@ class _PauseDialog extends StatelessWidget {
               const Divider(),
               const SizedBox(height: 12),
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  AudioManager().playClick();
+                  Navigator.pop(context);
+                },
                 child: Text(
                   "RESUME",
                   style: GoogleFonts.outfit(
@@ -1165,10 +1193,9 @@ class _PauseDialog extends StatelessWidget {
               const SizedBox(height: 8),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context); // Close dialog
-                  _confirmQuit(
-                    context,
-                  ); // This logic exists in ResetButton, we can move it or duplicate
+                  AudioManager().playClick();
+                  Navigator.pop(context);
+                  _confirmQuit(context);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: GameColors.red.withOpacity(0.1),
@@ -1217,7 +1244,10 @@ class _PauseDialog extends StatelessWidget {
             children: [
               Expanded(
                 child: TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    AudioManager().playClick();
+                    Navigator.pop(context);
+                  },
                   child: const Text(
                     "STAY",
                     style: TextStyle(
@@ -1231,6 +1261,7 @@ class _PauseDialog extends StatelessWidget {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {
+                    AudioManager().playClick();
                     Provider.of<GameState>(context, listen: false).quitMatch();
                     Navigator.of(context).popUntil((route) => route.isFirst);
                   },

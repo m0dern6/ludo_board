@@ -227,7 +227,10 @@ class GameState extends ChangeNotifier {
     notifyListeners();
 
     if (piece.progress == -1) {
-      piece.progress = 0; 
+      piece.progress = 0;
+      AudioManager().playMove();
+      notifyListeners();
+      await Future.delayed(const Duration(milliseconds: 250));
     } else {
       for (int i = 0; i < diceValue; i++) {
         if (!isMatchActive) return;

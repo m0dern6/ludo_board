@@ -290,31 +290,39 @@ class _BaseWidget extends StatelessWidget {
                 child: Container(
                   margin: EdgeInsets.all(cellSize * 0.18),
                   padding: EdgeInsets.symmetric(
-                    horizontal: cellSize * 0.22,
-                    vertical: cellSize * 0.12,
+                    horizontal: cellSize * 0.25,
+                    vertical: cellSize * 0.15,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.82),
-                    borderRadius: BorderRadius.circular(cellSize * 0.4),
+                    color: Colors.white.withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(cellSize * 0.6),
                     boxShadow: [
-                      BoxShadow(color: color.withOpacity(0.25), blurRadius: 4),
+                      BoxShadow(
+                        color: color.withOpacity(0.35),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
                     ],
+                    border: Border.all(
+                      color: color.withOpacity(0.3),
+                      width: 1,
+                    ),
                   ),
-                  child: Column(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: labelCrossAxis,
                     children: [
                       Text(
                         kAvatarEmojis[displayAvatar.clamp(0, kAvatarEmojis.length - 1)],
-                        style: TextStyle(fontSize: cellSize * 0.55),
+                        style: TextStyle(fontSize: cellSize * 0.45),
                       ),
+                      SizedBox(width: cellSize * 0.1),
                       Text(
                         displayName.length > 8
                             ? '${displayName.substring(0, 7)}…'
                             : displayName,
                         style: TextStyle(
-                          fontSize: cellSize * 0.32,
-                          fontWeight: FontWeight.bold,
+                          fontSize: cellSize * 0.30,
+                          fontWeight: FontWeight.w700,
                           color: color,
                         ),
                         overflow: TextOverflow.ellipsis,

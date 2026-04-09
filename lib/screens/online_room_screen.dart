@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../constants/colors.dart';
 import '../models/online_models.dart';
 import '../models/piece_model.dart';
+import '../services/audio_manager.dart';
 import '../services/online_service.dart';
 import 'online_game_screen.dart';
 
@@ -119,7 +120,10 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
           title: const Text('WAITING ROOM'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: _leaveRoom,
+            onPressed: () {
+              AudioManager().playClick();
+              _leaveRoom();
+            },
           ),
         ),
         body: StreamBuilder<DatabaseEvent>(
@@ -221,7 +225,10 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
                       ElevatedButton(
                         onPressed: _isStarting
                             ? null
-                            : () => _startMatch(players),
+                            : () {
+                                AudioManager().playClick();
+                                _startMatch(players);
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: GameColors.green,
                           minimumSize: const Size(double.infinity, 56),
@@ -335,6 +342,7 @@ class _RoomCodeCard extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.copy, color: GameColors.blue),
                 onPressed: () {
+                  AudioManager().playClick();
                   Clipboard.setData(ClipboardData(text: code));
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Code copied!')),
@@ -469,7 +477,10 @@ class _PlayerTile extends StatelessWidget {
                   final isSelected = c == player.color;
                   final col = _colorMap[c] ?? GameColors.red;
                   return GestureDetector(
-                    onTap: isSelected ? null : () => onColorChange!(c),
+                    onTap: isSelected ? null : () {
+                      AudioManager().playClick();
+                      onColorChange!(c);
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       margin: const EdgeInsets.only(right: 6),
@@ -588,7 +599,10 @@ class _AiFillToggle extends StatelessWidget {
           ),
           Switch(
             value: fillWithAi,
-            onChanged: (_) => onToggle(),
+            onChanged: (_) {
+              AudioManager().playClick();
+              onToggle();
+            },
             activeColor: GameColors.green,
           ),
         ],
