@@ -73,78 +73,86 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<GameState>.value(
       value: _gameState,
-      child: Scaffold(
-        body: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 16),
-              _OnlineHeader(
-                roomCode: widget.roomCode,
-                onChatToggle: _toggleChat,
-                chatOpen: _chatOpen,
-              ),
-              const Spacer(),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _OnlineCornerDice(
-                          player: PlayerType.red,
-                          textAtTop: true,
-                          localColor: _gameState.localColor,
-                        ),
-                        _OnlineCornerDice(
-                          player: PlayerType.green,
-                          textAtTop: true,
-                          localColor: _gameState.localColor,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    const LudoBoard(),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _OnlineCornerDice(
-                          player: PlayerType.blue,
-                          textAtTop: false,
-                          localColor: _gameState.localColor,
-                        ),
-                        _OnlineCornerDice(
-                          player: PlayerType.yellow,
-                          textAtTop: false,
-                          localColor: _gameState.localColor,
-                        ),
-                      ],
-                    ),
-                  ],
+      child: WillPopScope(
+        onWillPop: () async {
+          if (_chatOpen) {
+            setState(() => _chatOpen = false);
+            return false;
+          }
+          return true;
+        },
+        child: Scaffold(
+          body: SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                _OnlineHeader(
+                  roomCode: widget.roomCode,
+                  onChatToggle: _toggleChat,
+                  chatOpen: _chatOpen,
                 ),
-              ),
-              const Spacer(),
-              _OnlineQuitButton(
-                roomCode: widget.roomCode,
-                localUid: widget.localUid,
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
+                const Spacer(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _OnlineCornerDice(
+                            player: PlayerType.red,
+                            textAtTop: true,
+                            localColor: _gameState.localColor,
+                          ),
+                          _OnlineCornerDice(
+                            player: PlayerType.green,
+                            textAtTop: true,
+                            localColor: _gameState.localColor,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const LudoBoard(),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _OnlineCornerDice(
+                            player: PlayerType.blue,
+                            textAtTop: false,
+                            localColor: _gameState.localColor,
+                          ),
+                          _OnlineCornerDice(
+                            player: PlayerType.yellow,
+                            textAtTop: false,
+                            localColor: _gameState.localColor,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                _OnlineQuitButton(
+                  roomCode: widget.roomCode,
+                  localUid: widget.localUid,
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
         ),
-
-        // Chat overlay
-        bottomSheet: _chatOpen
-            ? _ChatPanel(
-                roomCode: widget.roomCode,
-                localUid: widget.localUid,
-                localName: widget.initialRoom.players[widget.localUid]?.name ??
-                    'Player',
-                localAvatar:
-                    widget.initialRoom.players[widget.localUid]?.avatar ?? 0,
-              )
-            : null,
+          // Chat overlay
+          bottomSheet: _chatOpen
+              ? _ChatPanel(
+                  roomCode: widget.roomCode,
+                  localUid: widget.localUid,
+                  localName: widget.initialRoom.players[widget.localUid]?.name ??
+                      'Player',
+                  localAvatar:
+                      widget.initialRoom.players[widget.localUid]?.avatar ?? 0,
+                )
+              : null,
+        ),
       ),
     );
   }
