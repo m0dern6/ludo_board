@@ -1,0 +1,62 @@
+name: Deploy to Google Play Production
+
+# This workflow is triggered ONLY when you push a tag starting with 'v'
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: # Allows manual trigger from Actions tab for testing
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checks out your repository's code so the workflow can access it
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Sets up the Java environment, which is required for Android builds
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 3. Sets up the Flutter SDK
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6' # IMPORTANT: Change to your Flutter version
+          channel: 'stable'
+          cache: true # Caches Flutter dependencies for faster builds
+
+      # 4. Gets all the Dart/Flutter packages
+      - name: Get dependencies
+        run: flutter pub get
+
+      # 5. Decodes the keystore from GitHub Secrets and places it in the project
+      - name: Decode Keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/keystore.jks
+
+      # 6. Creates the key.properties file needed by Gradle to sign the app
+      - name: Create key.properties
+        run: |
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "storeFile=keystore.jks" >> android/key.properties
+
+      # 7. Build the release App Bundle. It reads the version from pubspec.yaml
+      - name: Build App Bundle
+        run: flutter build appbundle --release
+
+      # 8. Uploads the built .aab file to the Play Store Production track
+      - name: Deploy to Production
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+          packageName: com.classic.ludo.board
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: production
+          changesNotSentForReview: true # Works well with Managed Publishing
