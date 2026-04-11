@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Data Deletion Request - Ludo Board: Classic Ludo Game</title>
+    <style>
+        :root {
+            --red: #e53935;
+            --blue: #1e88e5;
+            --ink: #243041;
+            --muted: #667085;
+            --line: #e8ebf0;
+            --card: #ffffff;
+            --bg: linear-gradient(180deg, #f6f7fb 0%, #eef3ff 100%);
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            color: var(--ink);
+            background: var(--bg);
+        }
+        .shell {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 28px 18px 40px;
+        }
+        .hero {
+            background: var(--card);
+            border: 1px solid rgba(30, 136, 229, 0.12);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: 0 20px 40px rgba(26, 39, 63, 0.08);
+        }
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(2rem, 4vw, 3rem);
+            letter-spacing: -0.03em;
+            color: var(--red);
+        }
+        .subtitle {
+            margin: 0 0 20px;
+            color: var(--muted);
+        }
+        .grid {
+            display: grid;
+            gap: 16px;
+            margin-top: 20px;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 18px;
+        }
+        h2 {
+            margin: 0 0 12px;
+            color: var(--blue);
+            font-size: 1.05rem;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        input, select, textarea {
+            width: 100%;
+            border: 1px solid #cfd6e4;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font: inherit;
+            background: #fff;
+            color: var(--ink);
+        }
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        .field {
+            margin-bottom: 14px;
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .button {
+            appearance: none;
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 18px;
+            font-weight: 700;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--red), #ff6a5f);
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(229, 57, 53, 0.25);
+        }
+        .hint {
+            color: var(--muted);
+            font-size: 0.95rem;
+            margin: 0;
+        }
+        .list {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .error {
+            display: none;
+            margin-top: 10px;
+            color: #b42318;
+            font-weight: 600;
+        }
+        .footer {
+            text-align: center;
+            color: #7a8494;
+            margin-top: 22px;
+            font-size: 0.95rem;
+        }
+        @media (min-width: 820px) {
+            .grid.two {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="hero">
+            <h1>User Data Deletion Request</h1>
+            <p class="subtitle">Submit this form and your default mail app will open with the request prefilled for info@zenithdigitalsolution.com.np.</p>
+
+            <form id="deletionForm">
+                <div class="grid two">
+                    <div class="field">
+                        <label for="fullName">Full name</label>
+                        <input id="fullName" name="fullName" type="text" placeholder="Your full name" required>
+                    </div>
+                    <div class="field">
+                        <label for="email">Email address</label>
+                        <input id="email" name="email" type="email" placeholder="name@example.com" required>
+                    </div>
+                </div>
+
+                <div class="grid two">
+                    <div class="field">
+                        <label for="accountEmail">Account email used in the app</label>
+                        <input id="accountEmail" name="accountEmail" type="email" placeholder="If different from your contact email">
+                    </div>
+                    <div class="field">
+                        <label for="requestType">Request type</label>
+                        <select id="requestType" name="requestType" required>
+                            <option value="Delete my user data" selected>Delete my user data</option>
+                            <option value="Delete my account and user data">Delete my account and user data</option>
+                            <option value="Delete online game records only">Delete online game records only</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="details">Deletion details</label>
+                    <textarea id="details" name="details" placeholder="Describe the data you want removed, any room code, and anything else that helps identify your records." required></textarea>
+                </div>
+
+                <div class="grid two">
+                    <div class="field">
+                        <label for="country">Country/region</label>
+                        <input id="country" name="country" type="text" placeholder="Optional">
+                    </div>
+                    <div class="field">
+                        <label for="confirmation">Confirmation</label>
+                        <select id="confirmation" name="confirmation" required>
+                            <option value="" selected disabled>Select one</option>
+                            <option value="I confirm this request is for my own data">I confirm this request is for my own data</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="button" type="submit">Submit by Email</button>
+                    <p class="hint">This will open your email app with the request ready to send.</p>
+                </div>
+                <p id="formError" class="error">Please complete all required fields before submitting.</p>
+            </form>
+
+            <div class="grid">
+                <div class="card">
+                    <h2>What To Include</h2>
+                    <ul class="list">
+                        <li>Your full name and contact email.</li>
+                        <li>Your in-app account email if it is different.</li>
+                        <li>A clear description of the data you want deleted.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h2>What Happens Next</h2>
+                    <p class="hint">After submission, your mail app opens with a completed message addressed to <a href="mailto:info@zenithdigitalsolution.com.np">info@zenithdigitalsolution.com.np</a>.</p>
+                </div>
+            </div>
+        </section>
+
+        <p class="footer">&copy; 2024 Ludo Board: Classic Ludo Game. All rights reserved.</p>
+    </main>
+
+    <script>
+        const form = document.getElementById('deletionForm');
+        const error = document.getElementById('formError');
+        const recipient = 'info@zenithdigitalsolution.com.np';
+
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+
+            if (!form.checkValidity()) {
+                error.style.display = 'block';
+                form.reportValidity();
+                return;
+            }
+
+            error.style.display = 'none';
+
+            const fullName = document.getElementById('fullName').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const accountEmail = document.getElementById('accountEmail').value.trim();
+            const requestType = document.getElementById('requestType').value.trim();
+            const details = document.getElementById('details').value.trim();
+            const country = document.getElementById('country').value.trim();
+
+            const subject = encodeURIComponent(`User Data Deletion Request - ${fullName}`);
+            const bodyLines = [
+                `Full name: ${fullName}`,
+                `Contact email: ${email}`,
+                accountEmail ? `Account email: ${accountEmail}` : 'Account email: Not provided',
+                `Request type: ${requestType}`,
+                country ? `Country/region: ${country}` : 'Country/region: Not provided',
+                '',
+                'Deletion details:',
+                details,
+                '',
+                'Please confirm once the request is received.'
+            ];
+
+            const body = encodeURIComponent(bodyLines.join('\n'));
+            window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+        });
+    </script>
+</body>
+</html>
