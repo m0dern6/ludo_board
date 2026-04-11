@@ -71,4 +71,3 @@ jobs:
           packageName: com.classic.ludo.board
           releaseFiles: build/app/outputs/bundle/release/app-release.aab
           track: production
-          changesNotSentForReview: true # Works well with Managed Publishing
