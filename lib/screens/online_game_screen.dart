@@ -142,11 +142,10 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
         if (msg.uid == widget.localUid) continue;
         final player = widget.initialRoom.players[msg.uid];
         if (player == null) continue;
-        final pType = PlayerType.values.firstWhere(
-          (t) => t.name == player.color,
-          orElse: () => PlayerType.red,
-        );
-        _showMessageBubble(pType, msg.text, player.name, player.avatar);
+        // Only show bubble when the color is a known PlayerType
+        final pTypeMatches = PlayerType.values.where((t) => t.name == player.color);
+        if (pTypeMatches.isEmpty) continue;
+        _showMessageBubble(pTypeMatches.first, msg.text, player.name, player.avatar);
       }
 
       if (_chatOpen) {
