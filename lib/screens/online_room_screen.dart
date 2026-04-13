@@ -68,6 +68,40 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
       mustKillToEnterHome: currentRules.mustKillToEnterHome,
       quickMode: currentRules.quickMode,
       fillWithAi: !currentRules.fillWithAi,
+      triplesSixLosesTurn: currentRules.triplesSixLosesTurn,
+      sixAlwaysRerolls: currentRules.sixAlwaysRerolls,
+    );
+    try {
+      await _svc.updateRules(widget.roomCode, updated);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not update rules: $e');
+    }
+  }
+
+  Future<void> _toggleTriplesSixLosesTurn(GameRules currentRules) async {
+    final updated = GameRules(
+      rediceOnOne: currentRules.rediceOnOne,
+      mustKillToEnterHome: currentRules.mustKillToEnterHome,
+      quickMode: currentRules.quickMode,
+      fillWithAi: currentRules.fillWithAi,
+      triplesSixLosesTurn: !currentRules.triplesSixLosesTurn,
+      sixAlwaysRerolls: currentRules.sixAlwaysRerolls,
+    );
+    try {
+      await _svc.updateRules(widget.roomCode, updated);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not update rules: $e');
+    }
+  }
+
+  Future<void> _toggleSixAlwaysRerolls(GameRules currentRules) async {
+    final updated = GameRules(
+      rediceOnOne: currentRules.rediceOnOne,
+      mustKillToEnterHome: currentRules.mustKillToEnterHome,
+      quickMode: currentRules.quickMode,
+      fillWithAi: currentRules.fillWithAi,
+      triplesSixLosesTurn: currentRules.triplesSixLosesTurn,
+      sixAlwaysRerolls: !currentRules.sixAlwaysRerolls,
     );
     try {
       await _svc.updateRules(widget.roomCode, updated);
@@ -210,6 +244,26 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
                       _AiFillToggle(
                         fillWithAi: room.rules.fillWithAi,
                         onToggle: () => _toggleFillWithAi(room.rules),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Rule toggles (host only)
+                    if (isHost) ...[
+                      _RuleToggleTile(
+                        icon: Icons.casino_outlined,
+                        title: 'Triple 6 Loses Turn',
+                        subtitle: 'Rolling 6 three times in a row skips your turn',
+                        value: room.rules.triplesSixLosesTurn,
+                        onToggle: () => _toggleTriplesSixLosesTurn(room.rules),
+                      ),
+                      const SizedBox(height: 12),
+                      _RuleToggleTile(
+                        icon: Icons.replay_outlined,
+                        title: '6 Always Re-rolls',
+                        subtitle: 'Rolling 6 always grants an extra turn, even with no moves',
+                        value: room.rules.sixAlwaysRerolls,
+                        onToggle: () => _toggleSixAlwaysRerolls(room.rules),
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -604,6 +658,80 @@ class _AiFillToggle extends StatelessWidget {
               onToggle();
             },
             activeColor: GameColors.green,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Generic rule toggle tile (host-only)
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _RuleToggleTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final VoidCallback onToggle;
+
+  const _RuleToggleTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: value
+              ? GameColors.blue.withOpacity(0.3)
+              : Colors.grey.shade200,
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: value ? GameColors.blue : Colors.grey,
+            size: 22,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: value ? Colors.black87 : Colors.grey,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: (_) {
+              AudioManager().playClick();
+              onToggle();
+            },
+            activeColor: GameColors.blue,
           ),
         ],
       ),

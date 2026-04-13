@@ -43,6 +43,10 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
   String? _latestChatId;
   Timer? _badgePulseTimer;
 
+  // Per-player floating message bubbles (shown near each player's base)
+  final Map<PlayerType, _ActiveMessage> _playerMessages = {};
+  final Map<PlayerType, Timer> _messageTimers = {};
+
   StreamSubscription<DatabaseEvent>? _chatSub;
 
   void _enableImmersiveMode() {
@@ -125,6 +129,25 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
         return;
       }
 
+      // Compute start index for new messages
+      int startIndex = 0;
+      if (_lastSeenChatId != null) {
+        final i = msgs.lastIndexWhere((m) => m.id == _lastSeenChatId);
+        if (i != -1) startIndex = i + 1;
+      }
+
+      // Show floating message bubbles for new messages from other players
+      for (int i = startIndex; i < msgs.length; i++) {
+        final msg = msgs[i];
+        if (msg.uid == widget.localUid) continue;
+        final player = widget.initialRoom.players[msg.uid];
+        if (player == null) continue;
+        // Only show bubble when the color is a known PlayerType
+        final pTypeMatches = PlayerType.values.where((t) => t.name == player.color);
+        if (pTypeMatches.isEmpty) continue;
+        _showMessageBubble(pTypeMatches.first, msg.text, player.name, player.avatar);
+      }
+
       if (_chatOpen) {
         if (_unreadChatCount != 0 || _lastSeenChatId != latest.id) {
           setState(() {
@@ -143,6 +166,18 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
         setState(() => _unreadChatCount = unread);
       }
     } catch (_) {}
+  }
+
+  void _showMessageBubble(PlayerType player, String text, String name, int avatar) {
+    _messageTimers[player]?.cancel();
+    setState(() {
+      _playerMessages[player] = _ActiveMessage(text: text, name: name, avatar: avatar);
+    });
+    _messageTimers[player] = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() => _playerMessages.remove(player));
+      }
+    });
   }
 
   void _triggerBadgePulse() {
@@ -179,6 +214,9 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
     _gameState.quitMatch();
     _badgePulseTimer?.cancel();
     _chatSub?.cancel();
+    for (final t in _messageTimers.values) {
+      t.cancel();
+    }
     AudioManager().stopAllSfx();
     AudioManager().startBgm();
     _restoreSystemUi();
@@ -230,41 +268,90 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
                 const Spacer(),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
+                  child: Stack(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Column(
                         children: [
-                          _CornerArea(
-                            player: PlayerType.red,
-                            textAtTop: true,
-                            localColor: _gameState.localColor,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _CornerArea(
+                                player: PlayerType.red,
+                                textAtTop: true,
+                                localColor: _gameState.localColor,
+                              ),
+                              _CornerArea(
+                                player: PlayerType.green,
+                                textAtTop: true,
+                                localColor: _gameState.localColor,
+                              ),
+                            ],
                           ),
-                          _CornerArea(
-                            player: PlayerType.green,
-                            textAtTop: true,
-                            localColor: _gameState.localColor,
+                          const SizedBox(height: 4),
+                          const LudoBoard(),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _CornerArea(
+                                player: PlayerType.blue,
+                                textAtTop: false,
+                                localColor: _gameState.localColor,
+                              ),
+                              _CornerArea(
+                                player: PlayerType.yellow,
+                                textAtTop: false,
+                                localColor: _gameState.localColor,
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      const LudoBoard(),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _CornerArea(
-                            player: PlayerType.blue,
-                            textAtTop: false,
-                            localColor: _gameState.localColor,
+                      // Floating message bubbles — overlaid without affecting layout
+                      if (_playerMessages.containsKey(PlayerType.red))
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          child: IgnorePointer(
+                            child: _PlayerMessageBubble(
+                              player: PlayerType.red,
+                              message: _playerMessages[PlayerType.red]!,
+                            ),
                           ),
-                          _CornerArea(
-                            player: PlayerType.yellow,
-                            textAtTop: false,
-                            localColor: _gameState.localColor,
+                        ),
+                      if (_playerMessages.containsKey(PlayerType.green))
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: IgnorePointer(
+                            child: _PlayerMessageBubble(
+                              player: PlayerType.green,
+                              message: _playerMessages[PlayerType.green]!,
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                      if (_playerMessages.containsKey(PlayerType.blue))
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          child: IgnorePointer(
+                            child: _PlayerMessageBubble(
+                              player: PlayerType.blue,
+                              message: _playerMessages[PlayerType.blue]!,
+                            ),
+                          ),
+                        ),
+                      if (_playerMessages.containsKey(PlayerType.yellow))
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: IgnorePointer(
+                            child: _PlayerMessageBubble(
+                              player: PlayerType.yellow,
+                              message: _playerMessages[PlayerType.yellow]!,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -932,6 +1019,95 @@ class _ChatPanelState extends State<_ChatPanel> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Floating chat message bubble shown near each player's base corner
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _ActiveMessage {
+  final String text;
+  final String name;
+  final int avatar;
+  const _ActiveMessage({required this.text, required this.name, required this.avatar});
+}
+
+class _PlayerMessageBubble extends StatelessWidget {
+  final PlayerType player;
+  final _ActiveMessage message;
+
+  const _PlayerMessageBubble({
+    required this.player,
+    required this.message,
+  });
+
+  Color _bubbleColor() {
+    switch (player) {
+      case PlayerType.red:
+        return GameColors.red;
+      case PlayerType.green:
+        return GameColors.green;
+      case PlayerType.blue:
+        return GameColors.blue;
+      case PlayerType.yellow:
+        return GameColors.yellow;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _bubbleColor();
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 150),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                avatarEmoji(message.avatar),
+                style: const TextStyle(fontSize: 11),
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  message.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            message.text,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
           ),
         ],
       ),
