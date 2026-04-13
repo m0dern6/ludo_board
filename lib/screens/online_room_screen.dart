@@ -78,42 +78,13 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
     }
   }
 
-  Future<void> _toggleTriplesSixLosesTurn(GameRules currentRules) async {
-    final updated = GameRules(
-      rediceOnOne: currentRules.rediceOnOne,
-      mustKillToEnterHome: currentRules.mustKillToEnterHome,
-      quickMode: currentRules.quickMode,
-      fillWithAi: currentRules.fillWithAi,
-      triplesSixLosesTurn: !currentRules.triplesSixLosesTurn,
-      sixAlwaysRerolls: currentRules.sixAlwaysRerolls,
-    );
-    try {
-      await _svc.updateRules(widget.roomCode, updated);
-    } catch (e) {
-      if (mounted) setState(() => _error = 'Could not update rules: $e');
-    }
-  }
-
-  Future<void> _toggleSixAlwaysRerolls(GameRules currentRules) async {
-    final updated = GameRules(
-      rediceOnOne: currentRules.rediceOnOne,
-      mustKillToEnterHome: currentRules.mustKillToEnterHome,
-      quickMode: currentRules.quickMode,
-      fillWithAi: currentRules.fillWithAi,
-      triplesSixLosesTurn: currentRules.triplesSixLosesTurn,
-      sixAlwaysRerolls: !currentRules.sixAlwaysRerolls,
-    );
-    try {
-      await _svc.updateRules(widget.roomCode, updated);
-    } catch (e) {
-      if (mounted) setState(() => _error = 'Could not update rules: $e');
-    }
-  }
-
   /// Returns the list of colors the local player may pick.
   /// - 2 players: can pick any of the 4 colors (the other auto-follows diagonal).
   /// - 3+ players: all colors not already taken by others.
-  List<String> _availableColors(Map<String, OnlinePlayer> players, String localColor) {
+  List<String> _availableColors(
+    Map<String, OnlinePlayer> players,
+    String localColor,
+  ) {
     if (players.length == 2) {
       return _allColors;
     }
@@ -121,7 +92,9 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
         .where((p) => p.uid != widget.localUid)
         .map((p) => p.color)
         .toSet();
-    return _allColors.where((c) => c == localColor || !taken.contains(c)).toList();
+    return _allColors
+        .where((c) => c == localColor || !taken.contains(c))
+        .toList();
   }
 
   Future<void> _changeColor(String newColor) async {
@@ -165,14 +138,16 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
-                  child: CircularProgressIndicator(color: GameColors.red));
+                child: CircularProgressIndicator(color: GameColors.red),
+              );
             }
             if (!snapshot.hasData || !snapshot.data!.snapshot.exists) {
-              return const Center(child: Text('Room not found or was deleted.'));
+              return const Center(
+                child: Text('Room not found or was deleted.'),
+              );
             }
 
-            final raw =
-                snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
+            final raw = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
             final room = OnlineRoom.fromMap(widget.roomCode, raw);
 
             // Room transitioned to playing → navigate to game
@@ -227,8 +202,12 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
                         isHost: p.uid == room.hostUid,
                         colorLabel: _colorNames[p.color] ?? p.color,
                         color: _colorMap[p.color] ?? GameColors.red,
-                        availableColors: p.uid == widget.localUid ? availableColors : null,
-                        onColorChange: p.uid == widget.localUid ? _changeColor : null,
+                        availableColors: p.uid == widget.localUid
+                            ? availableColors
+                            : null,
+                        onColorChange: p.uid == widget.localUid
+                            ? _changeColor
+                            : null,
                       ),
                     ),
 
@@ -248,31 +227,13 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
                       const SizedBox(height: 12),
                     ],
 
-                    // Rule toggles (host only)
-                    if (isHost) ...[
-                      _RuleToggleTile(
-                        icon: Icons.casino_outlined,
-                        title: 'Triple 6 Loses Turn',
-                        subtitle: 'Rolling 6 three times in a row skips your turn',
-                        value: room.rules.triplesSixLosesTurn,
-                        onToggle: () => _toggleTriplesSixLosesTurn(room.rules),
-                      ),
-                      const SizedBox(height: 12),
-                      _RuleToggleTile(
-                        icon: Icons.replay_outlined,
-                        title: '6 Always Re-rolls',
-                        subtitle: 'Rolling 6 always grants an extra turn, even with no moves',
-                        value: room.rules.sixAlwaysRerolls,
-                        onToggle: () => _toggleSixAlwaysRerolls(room.rules),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-
                     if (_error != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: Text(_error!,
-                            style: const TextStyle(color: Colors.red)),
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
                       ),
 
                     if (isHost)
@@ -292,7 +253,8 @@ class _OnlineRoomScreenState extends State<OnlineRoomScreen> {
                         ),
                         child: _isStarting
                             ? const CircularProgressIndicator(
-                                color: Colors.white)
+                                color: Colors.white,
+                              )
                             : Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -378,7 +340,10 @@ class _RoomCodeCard extends StatelessWidget {
           const Text(
             'ROOM CODE',
             style: TextStyle(
-                fontSize: 11, color: Colors.grey, letterSpacing: 2),
+              fontSize: 11,
+              color: Colors.grey,
+              letterSpacing: 2,
+            ),
           ),
           const SizedBox(height: 6),
           Row(
@@ -398,9 +363,9 @@ class _RoomCodeCard extends StatelessWidget {
                 onPressed: () {
                   AudioManager().playClick();
                   Clipboard.setData(ClipboardData(text: code));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Code copied!')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Code copied!')));
                 },
               ),
             ],
@@ -421,6 +386,7 @@ class _PlayerTile extends StatelessWidget {
   final bool isHost;
   final String colorLabel;
   final Color color;
+
   /// Colors the local player may switch to. Null means no color picker shown.
   final List<String>? availableColors;
   final Future<void> Function(String)? onColorChange;
@@ -459,8 +425,10 @@ class _PlayerTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(avatarEmoji(player.avatar),
-                  style: const TextStyle(fontSize: 28)),
+              Text(
+                avatarEmoji(player.avatar),
+                style: const TextStyle(fontSize: 28),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -476,7 +444,9 @@ class _PlayerTile extends StatelessWidget {
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: color.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(6),
@@ -484,22 +454,30 @@ class _PlayerTile extends StatelessWidget {
                             child: Text(
                               'YOU',
                               style: TextStyle(
-                                  color: color,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold),
+                                color: color,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
                         if (isHost) ...[
                           const SizedBox(width: 6),
-                          const Icon(Icons.star, color: GameColors.yellow, size: 14),
+                          const Icon(
+                            Icons.star,
+                            color: GameColors.yellow,
+                            size: 14,
+                          ),
                         ],
                       ],
                     ),
                     Text(
                       colorLabel,
                       style: TextStyle(
-                          color: color, fontSize: 12, fontWeight: FontWeight.w600),
+                        color: color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -508,33 +486,36 @@ class _PlayerTile extends StatelessWidget {
                 width: 12,
                 height: 12,
                 decoration: BoxDecoration(
-                  color: player.isOnline ? GameColors.green : Colors.grey.shade400,
+                  color: player.isOnline
+                      ? GameColors.green
+                      : Colors.grey.shade400,
                   shape: BoxShape.circle,
                 ),
               ),
             ],
           ),
           // Color picker for the local player
-          if (isLocalPlayer && availableColors != null && onColorChange != null) ...[
+          if (isLocalPlayer &&
+              availableColors != null &&
+              onColorChange != null) ...[
             const SizedBox(height: 10),
             Row(
               children: [
                 Text(
                   'Change color:',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade500,
-                  ),
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                 ),
                 const SizedBox(width: 8),
                 ...availableColors!.map((c) {
                   final isSelected = c == player.color;
                   final col = _colorMap[c] ?? GameColors.red;
                   return GestureDetector(
-                    onTap: isSelected ? null : () {
-                      AudioManager().playClick();
-                      onColorChange!(c);
-                    },
+                    onTap: isSelected
+                        ? null
+                        : () {
+                            AudioManager().playClick();
+                            onColorChange!(c);
+                          },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       margin: const EdgeInsets.only(right: 6),
@@ -544,7 +525,9 @@ class _PlayerTile extends StatelessWidget {
                         color: col,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? Colors.black54 : Colors.transparent,
+                          color: isSelected
+                              ? Colors.black54
+                              : Colors.transparent,
                           width: isSelected ? 2.5 : 0,
                         ),
                         boxShadow: [
@@ -555,8 +538,11 @@ class _PlayerTile extends StatelessWidget {
                         ],
                       ),
                       child: isSelected
-                          ? const Icon(Icons.check,
-                              size: 14, color: Colors.white)
+                          ? const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Colors.white,
+                            )
                           : null,
                     ),
                   );
@@ -582,11 +568,18 @@ class _EmptySlotTile extends StatelessWidget {
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: Colors.grey.shade200, width: 1.5, style: BorderStyle.solid),
+          color: Colors.grey.shade200,
+          width: 1.5,
+          style: BorderStyle.solid,
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.person_add_outlined, color: Colors.grey.shade400, size: 28),
+          Icon(
+            Icons.person_add_outlined,
+            color: Colors.grey.shade400,
+            size: 28,
+          ),
           const SizedBox(width: 12),
           Text(
             'Waiting for player…',
@@ -658,80 +651,6 @@ class _AiFillToggle extends StatelessWidget {
               onToggle();
             },
             activeColor: GameColors.green,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Generic rule toggle tile (host-only)
-// ──────────────────────────────────────────────────────────────────────────────
-
-class _RuleToggleTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool value;
-  final VoidCallback onToggle;
-
-  const _RuleToggleTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onToggle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: value
-              ? GameColors.blue.withOpacity(0.3)
-              : Colors.grey.shade200,
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: value ? GameColors.blue : Colors.grey,
-            size: 22,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: value ? Colors.black87 : Colors.grey,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: (_) {
-              AudioManager().playClick();
-              onToggle();
-            },
-            activeColor: GameColors.blue,
           ),
         ],
       ),
