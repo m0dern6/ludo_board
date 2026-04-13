@@ -836,6 +836,24 @@ class SettingsScreen extends StatelessWidget {
               state.updateRules(state.rules);
             },
           ),
+          _RuleTile(
+            title: "Triple 6 Loses Turn",
+            subtitle: "Rolling 6 three times in a row skips your turn",
+            value: state.rules.triplesSixLosesTurn,
+            onChanged: (v) {
+              state.rules.triplesSixLosesTurn = v;
+              state.updateRules(state.rules);
+            },
+          ),
+          _RuleTile(
+            title: "6 Always Re-rolls",
+            subtitle: "Rolling 6 always grants an extra turn, even with no moves",
+            value: state.rules.sixAlwaysRerolls,
+            onChanged: (v) {
+              state.rules.sixAlwaysRerolls = v;
+              state.updateRules(state.rules);
+            },
+          ),
         ],
       ),
     );

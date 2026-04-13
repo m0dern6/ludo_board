@@ -131,8 +131,8 @@ class GameState extends ChangeNotifier {
     
     if (diceValue == 6) {
       sixCount++;
-      if (sixCount == 3) {
-        // Three 6s = turn lost
+      if (rules.triplesSixLosesTurn && sixCount == 3) {
+        // Three 6s = turn lost (when rule is enabled)
         sixCount = 0;
         status = GameStatus.moving;
         notifyListeners();
@@ -148,6 +148,14 @@ class GameState extends ChangeNotifier {
     _calculateMovablePieces();
     
     if (movablePieces.isEmpty) {
+      // If the rule is on and dice is 6, grant reroll instead of skipping turn
+      if (rules.sixAlwaysRerolls && diceValue == 6) {
+        status = GameStatus.rolling;
+        diceValue = 0;
+        notifyListeners();
+        _checkAndExecuteCpuTurn();
+        return;
+      }
       status = GameStatus.moving;
       notifyListeners();
       await Future.delayed(const Duration(seconds: 1));

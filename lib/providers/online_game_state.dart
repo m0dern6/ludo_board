@@ -359,7 +359,7 @@ class OnlineGameState extends GameState {
 
     if (diceValue == 6) {
       sixCount++;
-      if (sixCount == 3) {
+      if (rules.triplesSixLosesTurn && sixCount == 3) {
         sixCount = 0;
         status = GameStatus.moving;
         notifyListeners();
@@ -376,6 +376,15 @@ class OnlineGameState extends GameState {
     _calculateMovablePiecesInternal();
 
     if (movablePieces.isEmpty) {
+      // If the rule is on and dice is 6, grant reroll instead of skipping turn
+      if (rules.sixAlwaysRerolls && diceValue == 6) {
+        status = GameStatus.rolling;
+        diceValue = 0;
+        notifyListeners();
+        await _writeGameState();
+        await _checkAndExecuteAiTurn();
+        return;
+      }
       status = GameStatus.moving;
       notifyListeners();
       await _writeGameState();
