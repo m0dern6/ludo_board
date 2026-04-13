@@ -143,9 +143,16 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
         final player = widget.initialRoom.players[msg.uid];
         if (player == null) continue;
         // Only show bubble when the color is a known PlayerType
-        final pTypeMatches = PlayerType.values.where((t) => t.name == player.color);
+        final pTypeMatches = PlayerType.values.where(
+          (t) => t.name == player.color,
+        );
         if (pTypeMatches.isEmpty) continue;
-        _showMessageBubble(pTypeMatches.first, msg.text, player.name, player.avatar);
+        _showMessageBubble(
+          pTypeMatches.first,
+          msg.text,
+          player.name,
+          player.avatar,
+        );
       }
 
       if (_chatOpen) {
@@ -168,10 +175,19 @@ class _OnlineGameScreenState extends State<OnlineGameScreen> {
     } catch (_) {}
   }
 
-  void _showMessageBubble(PlayerType player, String text, String name, int avatar) {
+  void _showMessageBubble(
+    PlayerType player,
+    String text,
+    String name,
+    int avatar,
+  ) {
     _messageTimers[player]?.cancel();
     setState(() {
-      _playerMessages[player] = _ActiveMessage(text: text, name: name, avatar: avatar);
+      _playerMessages[player] = _ActiveMessage(
+        text: text,
+        name: name,
+        avatar: avatar,
+      );
     });
     _messageTimers[player] = Timer(const Duration(seconds: 3), () {
       if (mounted) {
@@ -751,6 +767,14 @@ class _ChatPanelState extends State<_ChatPanel> {
   final _scrollController = ScrollController();
   bool _isSending = false;
   String? _sendError;
+  bool _didInitialScrollToLatest = false;
+
+  void _jumpToLatestMessage() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    });
+  }
 
   @override
   void dispose() {
@@ -785,15 +809,7 @@ class _ChatPanelState extends State<_ChatPanel> {
     } else {
       _textController.clear();
       setState(() => _isSending = false);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-          );
-        }
-      });
+      _jumpToLatestMessage();
     }
   }
 
@@ -877,6 +893,10 @@ class _ChatPanelState extends State<_ChatPanel> {
                       style: TextStyle(color: Colors.grey, fontSize: 13),
                     ),
                   );
+                }
+                if (!_didInitialScrollToLatest) {
+                  _didInitialScrollToLatest = true;
+                  _jumpToLatestMessage();
                 }
                 return ListView.builder(
                   controller: _scrollController,
@@ -1034,17 +1054,18 @@ class _ActiveMessage {
   final String text;
   final String name;
   final int avatar;
-  const _ActiveMessage({required this.text, required this.name, required this.avatar});
+  const _ActiveMessage({
+    required this.text,
+    required this.name,
+    required this.avatar,
+  });
 }
 
 class _PlayerMessageBubble extends StatelessWidget {
   final PlayerType player;
   final _ActiveMessage message;
 
-  const _PlayerMessageBubble({
-    required this.player,
-    required this.message,
-  });
+  const _PlayerMessageBubble({required this.player, required this.message});
 
   Color _bubbleColor() {
     switch (player) {
@@ -1069,11 +1090,7 @@ class _PlayerMessageBubble extends StatelessWidget {
         color: color.withOpacity(0.92),
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
         ],
       ),
       child: Column(
